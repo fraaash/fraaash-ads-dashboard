@@ -10,6 +10,7 @@
 
 const express = require("express");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -134,6 +135,47 @@ const n0 = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
 
 // Airtable percent fields store 0.0272 for 2.72%.
 const pct = (v) => (typeof v === "number" && isFinite(v) ? v * 100 : null);
+
+/* ------------------------------------------------------------------ *
+ * Password gate
+ *
+ * One shared password, supplied as DASHBOARD_PASSWORD. Browsers remember
+ * it, so it is typed once per device rather than per visit.
+ *
+ * Left unset, the site is open. That is the local-dev case and it is
+ * deliberate, but it is also how someone accidentally publishes their ad
+ * spend, so the boot log says which mode it is in.
+ * ------------------------------------------------------------------ */
+
+const PASSWORD = process.env.DASHBOARD_PASSWORD;
+
+function sameSecret(supplied, actual) {
+  const a = Buffer.from(String(supplied), "utf8");
+  const b = Buffer.from(String(actual), "utf8");
+  // timingSafeEqual throws on length mismatch, and the length difference
+  // is not itself a secret worth protecting.
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+app.use((req, res, next) => {
+  if (!PASSWORD) return next();
+
+  // Render's health check sends no credentials. Gating it would make Render
+  // conclude the service is down and cycle it forever.
+  if (req.path === "/api/health") return next();
+
+  const parts = String(req.headers.authorization || "").split(" ");
+  if (parts[0] === "Basic" && parts[1]) {
+    const decoded = Buffer.from(parts[1], "base64").toString("utf8");
+    // Any username is accepted; only the password is checked.
+    const supplied = decoded.slice(decoded.indexOf(":") + 1);
+    if (sameSecret(supplied, PASSWORD)) return next();
+  }
+
+  res.set("WWW-Authenticate", 'Basic realm="Fraaash Ads", charset="UTF-8"');
+  res.status(401).type("text/plain").send("Authentication required.");
+});
 
 /* ------------------------------------------------------------------ *
  * Routes
@@ -358,4 +400,9 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`Fraaash Ads dashboard on :${PORT}`);
   console.log(`Airtable base ${BASE} | token ${TOKEN ? "configured" : "MISSING"}`);
+  console.log(
+    PASSWORD
+      ? "Password gate ON"
+      : "Password gate OFF - DASHBOARD_PASSWORD is not set, anyone with the URL can read this"
+  );
 });

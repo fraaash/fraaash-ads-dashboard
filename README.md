@@ -94,9 +94,22 @@ and would serve a Shopify 404.
 
 ## Access control
 
-The page has no login of its own. Put **Cloudflare Access** (Zero Trust) in front of
-`ads.fraaash.com` — email one-time-code, free up to 50 users. Without it, anyone who
-guesses the URL can read the account's spend and CAC.
+Set **`DASHBOARD_PASSWORD`** in Render's Environment tab. The server then asks for it
+via HTTP basic auth: any username works, only the password is checked, and the browser
+remembers it so it is typed once per device rather than per visit.
+
+`/api/health` is deliberately left open — Render's health check sends no credentials,
+and gating it would make Render conclude the service is down and cycle it forever. That
+endpoint reveals only whether the token is configured, never any data.
+
+**With `DASHBOARD_PASSWORD` unset the site is open to anyone with the URL**, which on a
+public hostname means the account's spend and margins. The boot log states which mode
+it is in.
+
+One shared password means no per-person audit trail. If that matters later, put
+**Cloudflare Access** in front instead and point it at Microsoft as the identity
+provider — since ops@fraaash.com is already a Microsoft account, that is a single click
+rather than a password, and it logs who opened it.
 
 ## API
 
