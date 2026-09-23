@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fraaash Ads Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --plane:#F0F2F0; --surface:#FDFDFC; --surface-sunk:#F6F7F5;
+    --ink:#0F1416; --ink-2:#4E5A5D; --muted:#87908F;
+    --grid:#E2E4E0; --rule:#D7DAD6; --hairline:rgba(15,20,22,.10);
+    --accent:#0E5560; --accent-soft:rgba(14,85,96,.10); --accent-ink:#fff;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --good-wash:rgba(12,163,12,.12); --warning-wash:rgba(250,178,25,.16);
+    --serious-wash:rgba(236,131,90,.16); --critical-wash:rgba(208,59,59,.12);
+    --radius:10px; --radius-sm:6px;
+    --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane:#0B0F11; --surface:#151B1D; --surface-sunk:#101618;
+      --ink:#E9EEED; --ink-2:#A7B3B2; --muted:#7C8887;
+      --grid:#232B2D; --rule:#2B3437; --hairline:rgba(233,238,237,.12);
+      --accent:#4FA8B8; --accent-soft:rgba(79,168,184,.16); --accent-ink:#08191C;
+      --good-wash:rgba(12,163,12,.20); --warning-wash:rgba(250,178,25,.20);
+      --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane:#0B0F11; --surface:#151B1D; --surface-sunk:#101618;
+    --ink:#E9EEED; --ink-2:#A7B3B2; --muted:#7C8887;
+    --grid:#232B2D; --rule:#2B3437; --hairline:rgba(233,238,237,.12);
+    --accent:#4FA8B8; --accent-soft:rgba(79,168,184,.16); --accent-ink:#08191C;
+    --good-wash:rgba(12,163,12,.20); --warning-wash:rgba(250,178,25,.20);
+    --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--plane); color:var(--ink); font-family:var(--ui);
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  img{max-width:100%}
+  [hidden]{display:none!important}
+  .wrap{max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+
+  .topbar{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:30;
+    background:color-mix(in srgb,var(--plane) 88%,transparent);
+    backdrop-filter:blur(12px); border-bottom:1px solid var(--rule);
+    padding-inline:16px; padding-block:12px;
+  }
+  .topbar-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
+  .brand h1{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .brand .acct{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .ranges{display:flex;gap:4px;flex-wrap:wrap}
+  .range-btn{
+    font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.03em;
+    padding:5px 9px;border-radius:var(--radius-sm);border:1px solid transparent;
+    background:transparent;color:var(--ink-2);cursor:pointer;
+  }
+  .range-btn:hover{background:var(--accent-soft);color:var(--ink)}
+  .range-btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .range-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .freshness{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.03em}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+  .dot.live{background:var(--good)} .dot.stale{background:var(--warning)} .dot.down{background:var(--critical)}
+
+  .hero{
+    background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
+    padding:20px;margin-top:20px;display:grid;
+    grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:24px;align-items:center;
+  }
+  @media (max-width:720px){.hero{grid-template-columns:1fr;gap:18px}}
+  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .hero-value{font-size:46px;font-weight:700;line-height:1;letter-spacing:-.02em;display:flex;align-items:baseline;gap:6px}
+  .hero-value .cur{font-size:20px;font-weight:500;color:var(--ink-2)}
+  .hero-sub{font-size:12px;color:var(--ink-2);margin-top:8px}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:4px;white-space:nowrap}
+  .chip.good{background:var(--good-wash);color:var(--ink)}
+  .chip.warning{background:var(--warning-wash);color:var(--ink)}
+  .chip.serious{background:var(--serious-wash);color:var(--ink)}
+  .chip.critical{background:var(--critical-wash);color:var(--ink)}
+  .chip.neutral{background:var(--surface-sunk);color:var(--ink-2)}
+  .chip .ico{width:9px;height:9px;border-radius:2px;flex:none}
+  .chip.good .ico{background:var(--good)} .chip.warning .ico{background:var(--warning)}
+  .chip.serious .ico{background:var(--serious)} .chip.critical .ico{background:var(--critical)}
+  .chip.neutral .ico{background:var(--muted)}
+
+  .meter-label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;gap:6px}
+  .meter{position:relative;height:34px}
+  .meter-track{position:absolute;inset:11px 0 auto 0;height:12px;border-radius:6px;overflow:hidden;display:flex;background:var(--surface-sunk)}
+  .meter-zone{height:100%}
+  .z-good{background:var(--good-wash)} .z-warning{background:var(--warning-wash)}
+  .z-serious{background:var(--serious-wash)} .z-critical{background:var(--critical-wash)}
+  .meter-needle{position:absolute;top:4px;width:3px;height:26px;border-radius:2px;background:var(--ink);box-shadow:0 0 0 2px var(--surface);transition:left .4s ease}
+  .meter-tick{position:absolute;top:9px;width:2px;height:16px;border-radius:1px}
+  .t-target{background:var(--good)} .t-breakeven{background:var(--warning)} .t-ceiling{background:var(--critical)}
+  .meter-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--ink-2);letter-spacing:.03em}
+  .meter-legend span{display:inline-flex;align-items:center;gap:5px}
+  .meter-legend i{width:8px;height:8px;border-radius:2px;display:inline-block}
+
+  .tiles{display:grid;gap:10px;margin-top:10px;grid-template-columns:repeat(6,minmax(0,1fr))}
+  @media (max-width:900px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .tile{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:12px 13px;min-width:0}
+  .tile .k{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .v{font-size:22px;font-weight:600;letter-spacing:-.01em;margin-top:5px;overflow-wrap:anywhere}
+  .tile .d{font-family:var(--mono);font-size:10px;margin-top:3px;color:var(--ink-2)}
+
+  section{margin-top:26px}
+  .sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .sec-head h2{font-size:13px;font-weight:700;margin:0}
+  .sec-head p{margin:0;font-size:12px;color:var(--muted);max-width:70ch}
+  .panel{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:16px}
+
+  .chart-host{position:relative;width:100%}
+  svg.chart{display:block;width:100%;height:auto;overflow:visible}
+  .tick{font-family:var(--mono);font-size:9px;fill:var(--muted)}
+  .axis-line{stroke:var(--rule);stroke-width:1}
+  .gridline{stroke:var(--grid);stroke-width:1}
+  .ref-label{font-family:var(--mono);font-size:9px;font-weight:600}
+
+  .tooltip{position:absolute;pointer-events:none;z-index:10;background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:8px 10px;font-size:11px;min-width:128px;box-shadow:0 6px 20px rgba(0,0,0,.14);opacity:0;transition:opacity .12s ease}
+  .tooltip.on{opacity:1}
+  .tt-d{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
+  .tt-r{display:flex;justify-content:space-between;gap:14px}
+  .tt-r b{font-family:var(--mono);font-weight:600}
+
+  .table-scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:620px}
+  th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
+  th{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  th:first-child,td:first-child{text-align:left;white-space:normal;min-width:200px}
+  td{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+  td:first-child{font-family:var(--ui);font-size:12.5px}
+  tbody tr:last-child td{border-bottom:none}
+  .stripe{display:inline-block;width:3px;height:15px;border-radius:2px;margin-right:8px;vertical-align:-3px}
+  .s-good{background:var(--good)} .s-warning{background:var(--warning)}
+  .s-serious{background:var(--serious)} .s-critical{background:var(--critical)} .s-neutral{background:var(--muted)}
+  .sub{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:2px}
+
+  .log-item{border-bottom:1px solid var(--grid);padding:14px 0}
+  .log-item:last-child{border-bottom:none} .log-item:first-child{padding-top:0}
+  .log-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+  .log-date{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em}
+  .log-sum{font-size:13px;margin:0 0 9px;max-width:68ch}
+  .log-metrics{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:9px;font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
+  .log-metrics b{color:var(--ink);font-weight:600}
+  ul.acts{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+  ul.acts li{display:grid;grid-template-columns:78px minmax(0,1fr);gap:10px;font-size:12px;align-items:start}
+  @media (max-width:560px){ul.acts li{grid-template-columns:1fr;gap:2px}}
+  .act-tag{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 5px;border-radius:3px;text-align:center;background:var(--surface-sunk);color:var(--ink-2)}
+  .act-tag.done{background:var(--good-wash);color:var(--ink)}
+  .act-tag.proposed{background:var(--warning-wash);color:var(--ink)}
+  .act-why{color:var(--ink-2)}
+
+  .state{padding:18px;border-radius:var(--radius-sm);background:var(--surface-sunk);border:1px dashed var(--rule);font-size:12.5px;color:var(--ink-2)}
+  .state b{color:var(--ink);font-weight:600;display:block;margin-bottom:3px}
+  .state.err{border-color:var(--critical);border-style:solid;background:var(--critical-wash)}
+  .state code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:1px 4px;border-radius:3px}
+  .skel{background:linear-gradient(90deg,var(--surface-sunk) 25%,var(--grid) 50%,var(--surface-sunk) 75%);background-size:200% 100%;animation:sh 1.4s ease-in-out infinite;border-radius:4px;color:transparent!important}
+  @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @media (prefers-reduced-motion:reduce){.skel{animation:none}*{transition:none!important}}
+
+  footer{margin-top:30px;padding-top:16px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;letter-spacing:.03em}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><h1>Fraaash Ads</h1><span class="acct">MY &middot; MYR &middot; Meta</span></div>
+    <div class="ranges" id="ranges" role="group" aria-label="Date range"></div>
+    <div class="freshness"><span class="dot" id="dot"></span><span id="fresh">Loading</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Blended CAC &middot; <span id="heroRange">last 7 days</span></div>
+      <div class="hero-value"><span class="cur">RM</span><span id="heroCac" class="skel">00.00</span></div>
+      <div class="hero-sub" id="heroSub">Cost per new website purchase across every active ad set.</div>
+      <div style="margin-top:10px"><span class="chip neutral" id="heroChip"><i class="ico"></i>Loading</span></div>
+    </div>
+    <div>
+      <div class="meter-label"><span>RM0</span><span>Goal 20</span><span>1st-order 42</span><span>Lifetime 55</span><span>RM70</span></div>
+      <div class="meter">
+        <div class="meter-track">
+          <div class="meter-zone z-good" style="width:28.6%"></div>
+          <div class="meter-zone z-warning" style="width:31.4%"></div>
+          <div class="meter-zone z-serious" style="width:18.6%"></div>
+          <div class="meter-zone z-critical" style="width:21.4%"></div>
+        </div>
+        <div class="meter-tick t-target" style="left:28.6%"></div>
+        <div class="meter-tick t-breakeven" style="left:60%"></div>
+        <div class="meter-tick t-ceiling" style="left:78.6%"></div>
+        <div class="meter-needle" id="needle" style="left:0%"></div>
+      </div>
+      <div class="meter-legend">
+        <span><i style="background:var(--good)"></i>At or under the RM20 goal</span>
+        <span><i style="background:var(--warning)"></i>First order still profitable</span>
+        <span><i style="background:var(--serious)"></i>Carried by repeat orders</span>
+        <span><i style="background:var(--critical)"></i>Unprofitable even on lifetime</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section>
+    <div class="sec-head">
+      <h2>Cost per purchase, by day</h2>
+      <p>RM42 is where the first order stops paying for itself; RM55 is where repeat orders stop covering it either. Days with no purchases are gaps, not zeros.</p>
+    </div>
+    <div class="panel"><div class="chart-host" id="cacHost"><div class="state">Loading daily series&hellip;</div></div></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Daily spend</h2>
+      <p>Same days as above. The dashed line is the RM210 ceiling the agent may never cross.</p>
+    </div>
+    <div class="panel"><div class="chart-host" id="spendHost"><div class="state">Loading daily spend&hellip;</div></div></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Ad sets</h2>
+      <p>Aggregated across the selected range. CAC, CTR and ROAS are recomputed from totals, not averaged.</p>
+    </div>
+    <div class="panel"><div id="adsetHost"><div class="state">Loading ad sets&hellip;</div></div></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>What the agent did</h2>
+      <p>Written each night at 23:59. Actions taken, why, and whether it worked.</p>
+    </div>
+    <div class="panel"><div id="logHost"><div class="state">Loading agent log&hellip;</div></div></div>
+  </section>
+
+  <footer>
+    <span>Account 26010778055250691</span>
+    <span>Meta &rarr; nightly agent &rarr; Airtable</span>
+    <span id="footStamp">&mdash;</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TARGET_CAC = 20, FIRST_ORDER_BE = 42, LIFETIME_CEIL = 55;
+  var SCALE_MAX = 70, LIFETIME_GP = 57.63, BUDGET_CAP = 210;
+
+  var RANGES = [
+    { id: "today",    label: "Today", days: 1 },
+    { id: "last_7d",  label: "7D",    days: 7 },
+    { id: "last_14d", label: "14D",   days: 14 },
+    { id: "last_30d", label: "30D",   days: 30 },
+    { id: "last_90d", label: "90D",   days: 90 }
+  ];
+  var LABEL = { today: "today", last_7d: "last 7 days", last_14d: "last 14 days",
+                last_30d: "last 30 days", last_90d: "last 90 days" };
+
+  var state = { range: "last_7d", daily: null, totals: null, adsets: null, log: null, stamp: null };
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- dates (business runs on Malaysia time) ---------- */
+  function todayISO() { return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10); }
+  function shiftDay(iso, d) {
+    var x = new Date(iso + "T00:00:00Z");
+    x.setUTCDate(x.getUTCDate() + d);
+    return x.toISOString().slice(0, 10);
+  }
+  function window_() {
+    var until = todayISO();
+    var days = RANGES.filter(function (r) { return r.id === state.range; })[0].days;
+    return { since: shiftDay(until, -(days - 1)), until: until };
+  }
+
+  /* ---------- formatting ---------- */
+  function fmt(n, dp) {
+    if (n === null || n === undefined || !isFinite(n)) return "—";
+    return n.toLocaleString("en-MY", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  }
+  function shortDate(iso) {
+    var p = String(iso).split("-");
+    if (p.length !== 3) return iso;
+    var M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return parseInt(p[2], 10) + " " + M[parseInt(p[1], 10) - 1];
+  }
+  function esc(s) {
+    return String(s === null || s === undefined ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function severity(cac) {
+    if (cac === null || cac === undefined) return "neutral";
+    if (cac <= TARGET_CAC) return "good";
+    if (cac <= FIRST_ORDER_BE) return "warning";
+    if (cac <= LIFETIME_CEIL) return "serious";
+    return "critical";
+  }
+  function severityWord(s) {
+    return { good:"On target", warning:"Profitable on first order",
+             serious:"Profitable only on repeat", critical:"Loses money over lifetime",
+             neutral:"No data" }[s];
+  }
+
+  /* ---------- fetch ---------- */
+  function api(path) {
+    return fetch(path, { headers: { Accept: "application/json" } }).then(function (r) {
+      return r.json().catch(function () {
+        throw { code: "bad_response", message: "The server did not return JSON (status " + r.status + ")." };
+      }).then(function (j) {
+        if (!r.ok || j.error) throw (j.error || { code: "http_" + r.status, message: "Request failed." });
+        return j;
+      });
+    }, function () {
+      throw { code: "offline", message: "Could not reach the dashboard server." };
+    });
+  }
+
+  function errorCopy(e) {
+    var c = e && e.code;
+    if (c === "no_token")
+      return ["Server not configured", "AIRTABLE_TOKEN is not set. Add it in Render → your service → Environment, then redeploy."];
+    if (c === "airtable_auth")
+      return ["Airtable rejected the token", "The token is wrong, expired, or not scoped to the Fraaash Ads base. Regenerate it at airtable.com/create/tokens."];
+    if (c === "airtable_not_found")
+      return ["Table missing", "The expected table is not in the base. Check the table names in the Fraaash Ads base."];
+    if (c === "airtable_rate_limited")
+      return ["Airtable is throttling", "Too many requests just now. This clears on its own within a few seconds."];
+    if (c === "airtable_unreachable" || c === "offline")
+      return ["Cannot reach the server", "Network problem, or the service is starting up. On the free tier the first load after idle takes up to a minute."];
+    return ["Could not load", (e && e.message) || "Unknown error."];
+  }
+
+  function showError(hostIds, e) {
+    var c = errorCopy(e);
+    var html = '<div class="state err"><b>' + esc(c[0]) + "</b>" + esc(c[1]) + "</div>";
+    hostIds.forEach(function (id) { var el = $(id); if (el) el.innerHTML = html; });
+  }
+
+  /* ---------- hero + tiles ---------- */
+  function renderHero() {
+    var t = state.totals;
+    var cacEl = $("heroCac"), chip = $("heroChip"), needle = $("needle"), sub = $("heroSub");
+    if (!t) return;
+    cacEl.className = "";
+    if (t.cac === null) {
+      cacEl.textContent = "—";
+      chip.className = "chip neutral";
+      chip.innerHTML = '<i class="ico"></i>No purchases in range';
+      needle.style.left = "0%";
+      sub.textContent = "No website purchases recorded in this range.";
+      return;
+    }
+    cacEl.textContent = fmt(t.cac, 2);
+    var sev = severity(t.cac);
+    chip.className = "chip " + sev;
+    chip.innerHTML = '<i class="ico"></i>' + esc(severityWord(sev));
+    needle.style.left = Math.max(0, Math.min(100, (t.cac / SCALE_MAX) * 100)) + "%";
+    var contrib = LIFETIME_GP - t.cac;
+    sub.textContent = t.purchases + " purchase" + (t.purchases === 1 ? "" : "s") +
+      " on RM" + fmt(t.spend, 2) + " · about RM" + fmt(Math.abs(contrib), 2) +
+      (contrib >= 0 ? " lifetime contribution" : " lifetime loss") + " per customer";
+  }
+
+  function renderTiles() {
+    var t = state.totals;
+    var defs = [
+      { k:"Ad spend",  v: t ? "RM" + fmt(t.spend, 2) : null, d: LABEL[state.range] },
+      { k:"Purchases", v: t ? String(t.purchases) : null,    d:"new customers" },
+      { k:"CAC",       v: t ? (t.cac === null ? "—" : "RM" + fmt(t.cac, 2)) : null, d:"goal RM20" },
+      { k:"CTR",       v: t ? (t.ctr === null ? "—" : fmt(t.ctr, 2) + "%") : null,  d:"all placements" },
+      { k:"ROAS",      v: t ? (t.roas === null ? "—" : fmt(t.roas, 2) + "×") : null, d:"in-platform" },
+      { k:"AOV",       v: t ? (t.aov === null ? "—" : "RM" + fmt(t.aov, 0)) : null, d:"per order" }
+    ];
+    $("tiles").innerHTML = defs.map(function (d) {
+      var val = d.v === null ? '<div class="v skel">000</div>' : '<div class="v">' + esc(d.v) + "</div>";
+      return '<div class="tile"><div class="k">' + esc(d.k) + "</div>" + val +
+             '<div class="d">' + esc(d.d) + "</div></div>";
+    }).join("");
+  }
+
+  /* ---------- charts ---------- */
+  function attachTip(host, rows, xOf, tipHtml) {
+    var tt = host.querySelector(".tooltip"), svgEl = host.querySelector("svg");
+    var cross = host.querySelector(".crosshair");
+    svgEl.addEventListener("mousemove", function (ev) {
+      var tgt = ev.target;
+      if (!tgt || !tgt.getAttribute || tgt.getAttribute("data-i") === null) { tt.classList.remove("on"); if (cross) cross.setAttribute("opacity","0"); return; }
+      var i = parseInt(tgt.getAttribute("data-i"), 10), r = rows[i];
+      var rect = host.getBoundingClientRect();
+      if (cross) { cross.setAttribute("x1", xOf(i)); cross.setAttribute("x2", xOf(i)); cross.setAttribute("opacity","1"); }
+      tt.innerHTML = '<div class="tt-d">' + esc(shortDate(r.d)) + "</div>" + tipHtml(r);
+      tt.classList.add("on");
+      var tw = tt.offsetWidth;
+      tt.style.left = Math.max(0, Math.min(rect.width - tw, (ev.clientX - rect.left) - tw / 2)) + "px";
+      tt.style.top = Math.max(0, (ev.clientY - rect.top) - tt.offsetHeight - 12) + "px";
+    });
+    svgEl.addEventListener("mouseleave", function () {
+      tt.classList.remove("on"); if (cross) cross.setAttribute("opacity","0");
+    });
+  }
+
+  function lineChart(hostId, rows, opts) {
+    var host = $(hostId);
+    if (!rows.length) {
+      host.innerHTML = '<div class="state"><b>Nothing to plot</b>' + esc(opts.empty) + "</div>";
+      return;
+    }
+    var W=760,H=230,mL=46,mR=16,mT=14,mB=28, iw=W-mL-mR, ih=H-mT-mB;
+    var maxV = Math.max.apply(null, rows.map(function(r){return r.v;}).concat([opts.ceil||0]));
+    maxV = Math.ceil(maxV * 1.12 / 10) * 10 || 10;
+    var x = function(i){ return rows.length===1 ? mL+iw/2 : mL + (i/(rows.length-1))*iw; };
+    var y = function(v){ return mT + ih - (v/maxV)*ih; };
+    var s = ['<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(opts.aria)+'">'];
+    for (var k=0;k<=4;k++){
+      var tv = Math.round((maxV/4)*k);
+      s.push('<line class="gridline" x1="'+mL+'" y1="'+y(tv)+'" x2="'+(W-mR)+'" y2="'+y(tv)+'"/>');
+      s.push('<text class="tick" x="'+(mL-8)+'" y="'+(y(tv)+3)+'" text-anchor="end">RM'+tv+'</text>');
+    }
+    (opts.refs||[]).forEach(function(rf){
+      if (rf.v > maxV) return;
+      s.push('<line x1="'+mL+'" y1="'+y(rf.v)+'" x2="'+(W-mR)+'" y2="'+y(rf.v)+'" stroke="'+rf.color+'" stroke-width="1.5" stroke-dasharray="4 3"/>');
+      s.push('<text class="ref-label" x="'+(W-mR)+'" y="'+(y(rf.v)-5)+'" text-anchor="end" fill="'+rf.color+'">'+esc(rf.label)+'</text>');
+    });
+    s.push('<path d="'+rows.map(function(r,i){return (i?"L":"M")+x(i)+" "+y(r.v);}).join(" ")+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+    rows.forEach(function(r,i){ s.push('<circle cx="'+x(i)+'" cy="'+y(r.v)+'" r="3.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>'); });
+    var every = Math.max(1, Math.ceil(rows.length/7));
+    rows.forEach(function(r,i){
+      if (i%every===0 || i===rows.length-1)
+        s.push('<text class="tick" x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(shortDate(r.d))+'</text>');
+    });
+    s.push('<line class="axis-line" x1="'+mL+'" y1="'+(mT+ih)+'" x2="'+(W-mR)+'" y2="'+(mT+ih)+'"/>');
+    s.push('<line class="crosshair" x1="0" y1="'+mT+'" x2="0" y2="'+(mT+ih)+'" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>');
+    rows.forEach(function(r,i){
+      var hw = rows.length===1 ? iw : iw/(rows.length-1);
+      s.push('<rect x="'+(x(i)-hw/2)+'" y="'+mT+'" width="'+hw+'" height="'+ih+'" fill="transparent" data-i="'+i+'"/>');
+    });
+    s.push('</svg>');
+    host.innerHTML = s.join("") + '<div class="tooltip"></div>';
+    attachTip(host, rows, x, opts.tip);
+  }
+
+  function barChart(hostId, rows, opts) {
+    var host = $(hostId);
+    if (!rows.length) {
+      host.innerHTML = '<div class="state"><b>Nothing to plot</b>' + esc(opts.empty) + "</div>";
+      return;
+    }
+    var W=760,H=180,mL=46,mR=16,mT=12,mB=28, iw=W-mL-mR, ih=H-mT-mB;
+    var maxV = Math.max.apply(null, rows.map(function(r){return r.v;}).concat([opts.cap||0]));
+    maxV = Math.ceil(maxV * 1.15 / 10) * 10 || 10;
+    var band = iw/rows.length, bw = Math.max(3, Math.min(30, band-2));
+    var y = function(v){ return mT + ih - (v/maxV)*ih; };
+    var cx = function(i){ return mL + band*i + band/2; };
+    var s = ['<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(opts.aria)+'">'];
+    for (var k=0;k<=3;k++){
+      var tv = Math.round((maxV/3)*k);
+      s.push('<line class="gridline" x1="'+mL+'" y1="'+y(tv)+'" x2="'+(W-mR)+'" y2="'+y(tv)+'"/>');
+      s.push('<text class="tick" x="'+(mL-8)+'" y="'+(y(tv)+3)+'" text-anchor="end">RM'+tv+'</text>');
+    }
+    if (opts.cap && opts.cap <= maxV) {
+      s.push('<line x1="'+mL+'" y1="'+y(opts.cap)+'" x2="'+(W-mR)+'" y2="'+y(opts.cap)+'" stroke="var(--critical)" stroke-width="1.5" stroke-dasharray="4 3"/>');
+      s.push('<text class="ref-label" x="'+(W-mR)+'" y="'+(y(opts.cap)-5)+'" text-anchor="end" fill="var(--critical)">Cap RM'+opts.cap+'</text>');
+    }
+    rows.forEach(function(r,i){
+      s.push('<rect x="'+(cx(i)-bw/2)+'" y="'+y(r.v)+'" width="'+bw+'" height="'+Math.max(2,(mT+ih)-y(r.v))+'" rx="4" fill="var(--accent)" data-i="'+i+'"/>');
+    });
+    var every = Math.max(1, Math.ceil(rows.length/7));
+    rows.forEach(function(r,i){
+      if (i%every===0 || i===rows.length-1)
+        s.push('<text class="tick" x="'+cx(i)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(shortDate(r.d))+'</text>');
+    });
+    s.push('<line class="axis-line" x1="'+mL+'" y1="'+(mT+ih)+'" x2="'+(W-mR)+'" y2="'+(mT+ih)+'"/>');
+    s.push('</svg>');
+    host.innerHTML = s.join("") + '<div class="tooltip"></div>';
+    attachTip(host, rows, cx, opts.tip);
+  }
+
+  function renderCharts() {
+    var days = state.daily || [];
+    lineChart("cacHost", days.filter(function(d){return d.purchases>0 && d.spend>0;})
+      .map(function(d){return {d:d.date, v:d.spend/d.purchases, spend:d.spend, purch:d.purchases};}), {
+      aria: "Cost per purchase by day in Malaysian ringgit",
+      empty: "No day in this range recorded a purchase.",
+      ceil: LIFETIME_CEIL + 8,
+      refs: [
+        { v: TARGET_CAC,     label: "Goal RM20",      color: "var(--good)" },
+        { v: FIRST_ORDER_BE, label: "1st-order RM42", color: "var(--warning)" },
+        { v: LIFETIME_CEIL,  label: "Lifetime RM55",  color: "var(--critical)" }
+      ],
+      tip: function (r) {
+        return '<div class="tt-r"><span>CAC</span><b>RM'+fmt(r.v,2)+'</b></div>' +
+               '<div class="tt-r"><span>Purchases</span><b>'+r.purch+'</b></div>' +
+               '<div class="tt-r"><span>Spend</span><b>RM'+fmt(r.spend,2)+'</b></div>';
+      }
+    });
+    barChart("spendHost", days.filter(function(d){return d.spend>0;})
+      .map(function(d){return {d:d.date, v:d.spend, purch:d.purchases};}), {
+      aria: "Daily advertising spend in Malaysian ringgit",
+      empty: "No spend recorded in this range.",
+      cap: BUDGET_CAP,
+      tip: function (r) {
+        return '<div class="tt-r"><span>Spend</span><b>RM'+fmt(r.v,2)+'</b></div>' +
+               '<div class="tt-r"><span>Purchases</span><b>'+r.purch+'</b></div>';
+      }
+    });
+  }
+
+  /* ---------- ad set table ---------- */
+  function renderAdsets() {
+    var host = $("adsetHost"), rows = state.adsets;
+    if (!rows) return;
+    if (!rows.length) {
+      host.innerHTML = '<div class="state"><b>No ad sets spent in this range</b>' +
+        "Either delivery is paused, or the agent has not written this range to Airtable yet.</div>";
+      return;
+    }
+    host.innerHTML = '<div class="table-scroll"><table><thead><tr>' +
+      "<th>Ad set</th><th>Spend</th><th>Purch</th><th>CAC</th><th>CTR</th><th>ROAS</th><th>Freq</th>" +
+      "</tr></thead><tbody>" + rows.map(function (a) {
+        return '<tr><td><span class="stripe s-' + severity(a.cac) + '"></span>' + esc(a.name) +
+          '<div class="sub">' + esc(a.status || "—") + "</div></td>" +
+          "<td>RM" + fmt(a.spend, 2) + "</td>" +
+          "<td>" + (a.purchases || 0) + "</td>" +
+          "<td><b>" + (a.cac === null ? "—" : "RM" + fmt(a.cac, 2)) + "</b></td>" +
+          "<td>" + (a.ctr === null ? "—" : fmt(a.ctr, 2) + "%") + "</td>" +
+          "<td>" + (a.roas === null ? "—" : fmt(a.roas, 2) + "×") + "</td>" +
+          "<td>" + (a.freq === null ? "—" : fmt(a.freq, 2)) + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+  }
+
+  /* ---------- agent log ---------- */
+  function renderLog() {
+    var host = $("logHost"), items = state.log;
+    if (!items) return;
+    if (!items.length) {
+      host.innerHTML = '<div class="state"><b>No entries yet</b>' +
+        "The nightly run writes here at 23:59. The first entry appears after tonight's pass.</div>";
+      return;
+    }
+    host.innerHTML = items.map(function (e) {
+      var v = String(e.verdict || "hold").toLowerCase();
+      var cls = v === "working" ? "good" : v === "not-working" ? "critical" : v === "mixed" ? "warning" : "neutral";
+      var word = v === "working" ? "Working" : v === "not-working" ? "Not working" : v === "mixed" ? "Mixed" : "Holding";
+      var mets = [];
+      if (e.cac !== null) mets.push("CAC <b>RM" + fmt(e.cac, 2) + "</b>");
+      if (e.spend !== null) mets.push("Spend <b>RM" + fmt(e.spend, 2) + "</b>");
+      if (e.purchases !== null) mets.push("Purchases <b>" + esc(e.purchases) + "</b>");
+      if (e.roas !== null) mets.push("ROAS <b>" + fmt(e.roas, 2) + "×</b>");
+      if (e.budgetTotal !== null) mets.push("Budget <b>RM" + fmt(e.budgetTotal, 0) + "/day</b>");
+
+      var acts = Array.isArray(e.actions) ? e.actions : [];
+      var actHtml = acts.length
+        ? '<ul class="acts">' + acts.map(function (a) {
+            var st = String(a.status || "done").toLowerCase() === "proposed" ? "proposed" : "done";
+            return '<li><span class="act-tag ' + st + '">' + esc(st === "proposed" ? "proposed" : (a.type || "done")) + "</span>" +
+              "<span><b>" + esc(a.entity || "—") + "</b>" +
+              (a.why ? ' <span class="act-why">— ' + esc(a.why) + "</span>" : "") + "</span></li>";
+          }).join("") + "</ul>"
+        : '<div style="font-size:12px;color:var(--muted)">No changes made.</div>';
+
+      return '<div class="log-item"><div class="log-top">' +
+        '<span class="log-date">' + esc(e.date || "") + "</span>" +
+        '<span class="chip ' + cls + '"><i class="ico"></i>' + word + "</span>" +
+        (e.needsApproval ? '<span class="chip warning"><i class="ico"></i>Needs you</span>' : "") +
+        "</div>" +
+        (e.summary ? '<p class="log-sum">' + esc(e.summary) + "</p>" : "") +
+        (mets.length ? '<div class="log-metrics">' + mets.join("") + "</div>" : "") +
+        actHtml + "</div>";
+    }).join("");
+  }
+
+  /* ---------- load ---------- */
+  function setFresh(kind, text) {
+    $("dot").className = "dot" + (kind ? " " + kind : "");
+    $("fresh").textContent = text;
+  }
+
+  function load() {
+    var w = window_();
+    var qs = "?since=" + w.since + "&until=" + w.until;
+    setFresh("", "Fetching");
+
+    api("/api/daily" + qs).then(function (j) {
+      state.daily = j.rows; state.totals = j.totals;
+      state.stamp = j.cachedAt || Date.now();
+      renderHero(); renderTiles(); renderCharts();
+      var d = new Date(state.stamp);
+      var txt = "Updated " + d.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" });
+      setFresh("live", txt);
+      $("footStamp").textContent = txt;
+    }).catch(function (e) {
+      setFresh("down", errorCopy(e)[0]);
+      showError(["cacHost", "spendHost"], e);
+    });
+
+    api("/api/adsets" + qs).then(function (j) {
+      state.adsets = j.rows; renderAdsets();
+    }).catch(function (e) { showError(["adsetHost"], e); });
+
+    api("/api/log?limit=30").then(function (j) {
+      state.log = j.rows; renderLog();
+    }).catch(function (e) { showError(["logHost"], e); });
+  }
+
+  function buildRanges() {
+    var host = $("ranges");
+    RANGES.forEach(function (r) {
+      var b = document.createElement("button");
+      b.className = "range-btn"; b.type = "button"; b.textContent = r.label;
+      b.id = "range-" + r.id;
+      b.setAttribute("aria-pressed", String(r.id === state.range));
+      b.addEventListener("click", function () {
+        if (state.range === r.id) return;
+        state.range = r.id;
+        Array.prototype.forEach.call(host.children, function (c) {
+          c.setAttribute("aria-pressed", String(c.id === "range-" + r.id));
+        });
+        $("heroRange").textContent = LABEL[r.id];
+        state.daily = state.totals = state.adsets = null;
+        $("heroCac").className = "skel";
+        $("cacHost").innerHTML = '<div class="state">Loading&hellip;</div>';
+        $("spendHost").innerHTML = '<div class="state">Loading&hellip;</div>';
+        $("adsetHost").innerHTML = '<div class="state">Loading&hellip;</div>';
+        renderTiles();
+        load();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  buildRanges();
+  renderTiles();
+  $("heroRange").textContent = LABEL[state.range];
+  load();
+  setInterval(load, 300000);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) load();
+  });
+})();
+</script>
+</body>
+</html>
