@@ -6,39 +6,50 @@
 <title>Fraaash Ads Control</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
+  /* Brand: --color-primary-rgb "10 104 54" from the fraaash.com Shopify theme,
+     i.e. #0a6836, and Inter as the storefront's UI face. Brand green doubles as
+     the "on target" status, so nothing on screen is green except good news --
+     trouble escalates through amber, coral, red. */
   :root {
     color-scheme: light;
-    --plane:#F0F2F0; --surface:#FDFDFC; --surface-sunk:#F6F7F5;
-    --ink:#0F1416; --ink-2:#4E5A5D; --muted:#87908F;
-    --grid:#E2E4E0; --rule:#D7DAD6; --hairline:rgba(15,20,22,.10);
-    --accent:#0E5560; --accent-soft:rgba(14,85,96,.10); --accent-ink:#fff;
-    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
-    --good-wash:rgba(12,163,12,.12); --warning-wash:rgba(250,178,25,.16);
+    --plane:#F1F3F0; --surface:#FDFDFC; --surface-sunk:#F5F7F3;
+    --ink:#101511; --ink-2:#4E5A52; --muted:#86908A;
+    --grid:#E3E6E0; --rule:#D8DCD5; --hairline:rgba(16,21,17,.10);
+    --brand:#0a6836;
+    --accent:#0a6836; --accent-soft:rgba(10,104,54,.10); --accent-ink:#fff;
+    --good:#0a6836; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+    --good-wash:rgba(10,104,54,.12); --warning-wash:rgba(250,178,25,.16);
     --serious-wash:rgba(236,131,90,.16); --critical-wash:rgba(208,59,59,.12);
     --radius:10px; --radius-sm:6px;
-    --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
-    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+    /* One face throughout, as the storefront does. Figures line up through
+       tabular-nums rather than by swapping in a second, off-brand family. */
+    --mono:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
   }
+  /* #0a6836 is too dark to read on a dark ground, so the dark theme steps the
+     same hue up to #3E9E62 rather than inventing a different colour. */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --plane:#0B0F11; --surface:#151B1D; --surface-sunk:#101618;
-      --ink:#E9EEED; --ink-2:#A7B3B2; --muted:#7C8887;
-      --grid:#232B2D; --rule:#2B3437; --hairline:rgba(233,238,237,.12);
-      --accent:#4FA8B8; --accent-soft:rgba(79,168,184,.16); --accent-ink:#08191C;
-      --good-wash:rgba(12,163,12,.20); --warning-wash:rgba(250,178,25,.20);
+      --plane:#0A0F0C; --surface:#141A16; --surface-sunk:#0F1511;
+      --ink:#E9EEEA; --ink-2:#A6B3AB; --muted:#7C8882;
+      --grid:#222B25; --rule:#2A342E; --hairline:rgba(233,238,234,.12);
+      --accent:#3E9E62; --accent-soft:rgba(62,158,98,.16); --accent-ink:#06180E;
+      --good:#3E9E62;
+      --good-wash:rgba(62,158,98,.20); --warning-wash:rgba(250,178,25,.20);
       --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --plane:#0B0F11; --surface:#151B1D; --surface-sunk:#101618;
-    --ink:#E9EEED; --ink-2:#A7B3B2; --muted:#7C8887;
-    --grid:#232B2D; --rule:#2B3437; --hairline:rgba(233,238,237,.12);
-    --accent:#4FA8B8; --accent-soft:rgba(79,168,184,.16); --accent-ink:#08191C;
-    --good-wash:rgba(12,163,12,.20); --warning-wash:rgba(250,178,25,.20);
+    --plane:#0A0F0C; --surface:#141A16; --surface-sunk:#0F1511;
+    --ink:#E9EEEA; --ink-2:#A6B3AB; --muted:#7C8882;
+    --grid:#222B25; --rule:#2A342E; --hairline:rgba(233,238,234,.12);
+    --accent:#3E9E62; --accent-soft:rgba(62,158,98,.16); --accent-ink:#06180E;
+    --good:#3E9E62;
+    --good-wash:rgba(62,158,98,.20); --warning-wash:rgba(250,178,25,.20);
     --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
   }
 
@@ -60,9 +71,14 @@
     padding-inline:16px; padding-block:12px;
   }
   .topbar-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  .brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
-  .brand h1{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
-  .brand .acct{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .brand{display:flex;align-items:center;gap:9px;margin-right:auto;min-width:0}
+  .brand img{height:19px;width:auto;display:block;flex:none}
+  .brand h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em;color:var(--ink-2)}
+  .brand .acct{font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+  @media (max-width:560px){ .brand .acct{display:none} }
+
+  /* One face throughout means figures need explicit tabular alignment. */
+  .hero-value,.tile .v,.log-metrics,.tooltip,.tick,.log-date{font-variant-numeric:tabular-nums}
   .ranges{display:flex;gap:4px;flex-wrap:wrap}
   .range-btn{
     font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.03em;
@@ -98,7 +114,7 @@
   .chip.serious .ico{background:var(--serious)} .chip.critical .ico{background:var(--critical)}
   .chip.neutral .ico{background:var(--muted)}
 
-  .meter-label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;gap:6px}
+  .meter-label{display:flex;flex-wrap:wrap;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;gap:4px 8px;font-weight:500}
   .meter{position:relative;height:34px}
   .meter-track{position:absolute;inset:11px 0 auto 0;height:12px;border-radius:6px;overflow:hidden;display:flex;background:var(--surface-sunk)}
   .meter-zone{height:100%}
@@ -159,8 +175,18 @@
   .log-metrics{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:9px;font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
   .log-metrics b{color:var(--ink);font-weight:600}
   ul.acts{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-  ul.acts li{display:grid;grid-template-columns:78px minmax(0,1fr);gap:10px;font-size:12px;align-items:start}
-  @media (max-width:560px){ul.acts li{grid-template-columns:1fr;gap:2px}}
+  ul.acts li{display:grid;grid-template-columns:78px minmax(0,1fr);gap:10px;font-size:12px;align-items:start;min-width:0}
+  /* Entity names are long unbroken ids -- W1_ViewCart30d_Purchase_260922,
+     120254579799760416. Underscores and digits do not offer break points, so
+     without this they refuse to wrap and shove the whole page sideways on a
+     phone. min-width:0 is needed too: a grid item defaults to min-content
+     width, which an unbreakable string sets to its full length. */
+  ul.acts li > span{min-width:0;overflow-wrap:anywhere;word-break:break-word}
+  .log-item,.log-sum,.log-metrics,.log-top{overflow-wrap:anywhere;min-width:0}
+  @media (max-width:560px){
+    ul.acts li{grid-template-columns:1fr;gap:3px}
+    .act-tag{justify-self:start}
+  }
   .act-tag{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 5px;border-radius:3px;text-align:center;background:var(--surface-sunk);color:var(--ink-2)}
   .act-tag.done{background:var(--good-wash);color:var(--ink)}
   .act-tag.proposed{background:var(--warning-wash);color:var(--ink)}
@@ -176,7 +202,8 @@
 
   .login-gate{position:fixed;inset:0;z-index:100;background:var(--plane);display:flex;align-items:center;justify-content:center;padding:20px}
   .login-card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:30px 26px;max-width:340px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.12)}
-  .login-brand{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .login-brand{margin-bottom:16px}
+  .login-brand img{height:26px;width:auto;display:block}
   .login-card h2{font-size:19px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
   .login-card p{color:var(--ink-2);font-size:13px;margin:0 0 18px}
   /* 16px keeps iOS from zooming the page when the field takes focus. */
@@ -193,7 +220,7 @@
 
 <div class="login-gate" id="loginGate" hidden>
   <form class="login-card" id="loginForm" autocomplete="on">
-    <div class="login-brand">Fraaash &middot; Internal</div>
+    <div class="login-brand"><img src="/fraaash-logo.webp" alt="Fraaash" width="120" height="49"></div>
     <h2>Ads Control</h2>
     <p>Enter the dashboard password.</p>
     <input id="loginPw" type="password" placeholder="Password" autocomplete="current-password" aria-label="Dashboard password">
@@ -204,7 +231,11 @@
 
 <div class="topbar">
   <div class="topbar-inner">
-    <div class="brand"><h1>Fraaash Ads</h1><span class="acct">MY &middot; MYR &middot; Meta</span></div>
+    <div class="brand">
+      <img src="/fraaash-logo.webp" alt="Fraaash" width="120" height="49">
+      <h1>Ads</h1>
+      <span class="acct">MY &middot; MYR &middot; Meta</span>
+    </div>
     <div class="ranges" id="ranges" role="group" aria-label="Date range"></div>
     <div class="freshness"><span class="dot" id="dot"></span><span id="fresh">Loading</span></div>
   </div>
@@ -464,8 +495,10 @@
       s.push('<line x1="'+mL+'" y1="'+y(rf.v)+'" x2="'+(W-mR)+'" y2="'+y(rf.v)+'" stroke="'+rf.color+'" stroke-width="1.5" stroke-dasharray="4 3"/>');
       s.push('<text class="ref-label" x="'+(W-mR)+'" y="'+(y(rf.v)-5)+'" text-anchor="end" fill="'+rf.color+'">'+esc(rf.label)+'</text>');
     });
-    s.push('<path d="'+rows.map(function(r,i){return (i?"L":"M")+x(i)+" "+y(r.v);}).join(" ")+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
-    rows.forEach(function(r,i){ s.push('<circle cx="'+x(i)+'" cy="'+y(r.v)+'" r="3.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>'); });
+    /* Neutral ink, not the brand green: the RM20 goal line is green, and a green
+       series line beside it would read as a second threshold. */
+    s.push('<path d="'+rows.map(function(r,i){return (i?"L":"M")+x(i)+" "+y(r.v);}).join(" ")+'" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+    rows.forEach(function(r,i){ s.push('<circle cx="'+x(i)+'" cy="'+y(r.v)+'" r="3.5" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>'); });
     var every = Math.max(1, Math.ceil(rows.length/7));
     rows.forEach(function(r,i){
       if (i%every===0 || i===rows.length-1)
