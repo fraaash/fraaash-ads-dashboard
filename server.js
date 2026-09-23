@@ -139,15 +139,32 @@ const pct = (v) => (typeof v === "number" && isFinite(v) ? v * 100 : null);
 /* ------------------------------------------------------------------ *
  * Password gate
  *
- * One shared password, supplied as DASHBOARD_PASSWORD. Browsers remember
- * it, so it is typed once per device rather than per visit.
+ * Password only -- no username. The page shows its own login card and
+ * posts to /api/login; there is no browser basic-auth dialog.
  *
- * Left unset, the site is open. That is the local-dev case and it is
- * deliberate, but it is also how someone accidentally publishes their ad
- * spend, so the boot log says which mode it is in.
+ * The check is server-side. index.html is served to anyone, but it holds
+ * no data: every figure comes from /api/*, which requires the session
+ * cookie. A client-side-only gate would put the password in the page
+ * source and leave the API wide open.
+ *
+ * The session is a signed cookie, nothing stored server-side. It is
+ * signed with a key derived from the password, so changing the password
+ * silently invalidates every existing session.
+ *
+ * Left unset, the site is open. That is the local-dev case, but it is
+ * also how someone publishes their ad spend by accident, so the boot log
+ * states which mode it is in.
  * ------------------------------------------------------------------ */
 
 const PASSWORD = process.env.DASHBOARD_PASSWORD;
+const SESSION_COOKIE = "fad_session";
+const SESSION_DAYS = 30;
+
+const signingKey = PASSWORD
+  ? crypto.createHash("sha256").update("fad|" + PASSWORD).digest()
+  : null;
+
+const b64url = (buf) => Buffer.from(buf).toString("base64url");
 
 function sameSecret(supplied, actual) {
   const a = Buffer.from(String(supplied), "utf8");
@@ -158,23 +175,108 @@ function sameSecret(supplied, actual) {
   return crypto.timingSafeEqual(a, b);
 }
 
+function mintSession() {
+  const exp = String(Date.now() + SESSION_DAYS * 86400_000);
+  const payload = b64url(exp);
+  const sig = b64url(crypto.createHmac("sha256", signingKey).update(payload).digest());
+  return payload + "." + sig;
+}
+
+function sessionValid(token) {
+  if (!token || typeof token !== "string") return false;
+  const dot = token.indexOf(".");
+  if (dot < 1) return false;
+  const payload = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  const expected = b64url(crypto.createHmac("sha256", signingKey).update(payload).digest());
+  if (!sameSecret(sig, expected)) return false;
+  const exp = parseInt(Buffer.from(payload, "base64url").toString("utf8"), 10);
+  return Number.isFinite(exp) && Date.now() < exp;
+}
+
+function readCookie(req, name) {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === name) return decodeURIComponent(part.slice(eq + 1).trim());
+  }
+  return null;
+}
+
+// Brute-force damping. In-process and per-instance, which is fine here:
+// the aim is to make guessing slow, not to build an auth service.
+const attempts = new Map();
+const ATTEMPT_LIMIT = 10;
+const ATTEMPT_WINDOW = 15 * 60_000;
+
+function tooManyAttempts(ip) {
+  const rec = attempts.get(ip);
+  if (!rec || Date.now() > rec.resetAt) return false;
+  return rec.count >= ATTEMPT_LIMIT;
+}
+function noteAttempt(ip, ok) {
+  if (ok) return attempts.delete(ip);
+  const rec = attempts.get(ip);
+  if (!rec || Date.now() > rec.resetAt) {
+    attempts.set(ip, { count: 1, resetAt: Date.now() + ATTEMPT_WINDOW });
+  } else {
+    rec.count++;
+  }
+}
+
+app.use(express.json({ limit: "8kb" }));
+
+app.post("/api/login", (req, res) => {
+  if (!PASSWORD) return res.json({ ok: true, open: true });
+
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  if (tooManyAttempts(ip)) {
+    return res.status(429).json({
+      error: { code: "too_many_attempts", message: "Too many attempts. Wait 15 minutes and try again." },
+    });
+  }
+
+  const supplied = req.body && typeof req.body.password === "string" ? req.body.password : "";
+  const ok = supplied.length > 0 && sameSecret(supplied, PASSWORD);
+  noteAttempt(ip, ok);
+
+  if (!ok) {
+    return res.status(401).json({ error: { code: "bad_password", message: "That password is not right." } });
+  }
+
+  res.cookie(SESSION_COOKIE, mintSession(), {
+    httpOnly: true,
+    secure: req.secure || req.headers["x-forwarded-proto"] === "https",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_DAYS * 86400_000,
+  });
+  res.json({ ok: true });
+});
+
+app.post("/api/logout", (req, res) => {
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.json({ ok: true });
+});
+
 app.use((req, res, next) => {
   if (!PASSWORD) return next();
 
-  // Render's health check sends no credentials. Gating it would make Render
+  // Render's health check sends no cookie. Gating it would make Render
   // conclude the service is down and cycle it forever.
   if (req.path === "/api/health") return next();
 
-  const parts = String(req.headers.authorization || "").split(" ");
-  if (parts[0] === "Basic" && parts[1]) {
-    const decoded = Buffer.from(parts[1], "base64").toString("utf8");
-    // Any username is accepted; only the password is checked.
-    const supplied = decoded.slice(decoded.indexOf(":") + 1);
-    if (sameSecret(supplied, PASSWORD)) return next();
-  }
+  if (sessionValid(readCookie(req, SESSION_COOKIE))) return next();
 
-  res.set("WWW-Authenticate", 'Basic realm="Fraaash Ads", charset="UTF-8"');
-  res.status(401).type("text/plain").send("Authentication required.");
+  // Everything under /api carries data, so it is refused. Anything else is
+  // the page shell, which holds no figures -- it renders its own login card
+  // once /api/* answers 401.
+  if (req.path.startsWith("/api/")) {
+    return res.status(401).json({ error: { code: "locked", message: "Password required." } });
+  }
+  next();
 });
 
 /* ------------------------------------------------------------------ *

@@ -174,10 +174,33 @@
   @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @media (prefers-reduced-motion:reduce){.skel{animation:none}*{transition:none!important}}
 
+  .login-gate{position:fixed;inset:0;z-index:100;background:var(--plane);display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:30px 26px;max-width:340px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.12)}
+  .login-brand{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .login-card h2{font-size:19px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
+  .login-card p{color:var(--ink-2);font-size:13px;margin:0 0 18px}
+  /* 16px keeps iOS from zooming the page when the field takes focus. */
+  .login-card input{width:100%;padding:11px 13px;border:1px solid var(--rule);border-radius:var(--radius-sm);font:inherit;font-size:16px;background:var(--surface-sunk);color:var(--ink);margin-bottom:10px}
+  .login-card input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .login-card button{width:100%;padding:11px;border:0;border-radius:var(--radius-sm);background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;font-size:15px;cursor:pointer}
+  .login-card button:disabled{opacity:.55;cursor:default}
+  .login-err{color:var(--critical);font-size:12.5px;margin-top:10px;min-height:17px}
+
   footer{margin-top:30px;padding-top:16px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;letter-spacing:.03em}
 </style>
 </head>
 <body>
+
+<div class="login-gate" id="loginGate" hidden>
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <div class="login-brand">Fraaash &middot; Internal</div>
+    <h2>Ads Control</h2>
+    <p>Enter the dashboard password.</p>
+    <input id="loginPw" type="password" placeholder="Password" autocomplete="current-password" aria-label="Dashboard password">
+    <button type="submit" id="loginBtn">Open dashboard</button>
+    <div class="login-err" id="loginErr" role="alert"></div>
+  </form>
+</div>
 
 <div class="topbar">
   <div class="topbar-inner">
@@ -595,6 +618,58 @@
     $("fresh").textContent = text;
   }
 
+  /* ---------- password gate ---------- */
+  var gateOpen = false;
+
+  function showGate() {
+    if (gateOpen) return;           // three requests can 401 at once
+    gateOpen = true;
+    $("loginGate").hidden = false;
+    setFresh("down", "Locked");
+    var pw = $("loginPw");
+    if (pw) pw.focus();
+  }
+
+  function hideGate() {
+    gateOpen = false;
+    $("loginGate").hidden = true;
+  }
+
+  function isLocked(e) { return e && e.code === "locked"; }
+
+  $("loginForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var pw = $("loginPw"), btn = $("loginBtn"), err = $("loginErr");
+    if (!pw.value) { err.textContent = "Enter the password."; return; }
+
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+    err.textContent = "";
+
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw.value })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+    }).then(function (res) {
+      btn.disabled = false;
+      btn.textContent = "Open dashboard";
+      if (res.ok) {
+        pw.value = "";
+        hideGate();
+        load();
+        return;
+      }
+      err.textContent = (res.j && res.j.error && res.j.error.message) || "That password is not right.";
+      pw.select();
+    }).catch(function () {
+      btn.disabled = false;
+      btn.textContent = "Open dashboard";
+      err.textContent = "Could not reach the server. Try again.";
+    });
+  });
+
   function load() {
     var w = window_();
     var qs = "?since=" + w.since + "&until=" + w.until;
@@ -609,17 +684,24 @@
       setFresh("live", txt);
       $("footStamp").textContent = txt;
     }).catch(function (e) {
+      if (isLocked(e)) return showGate();
       setFresh("down", errorCopy(e)[0]);
       showError(["cacHost", "spendHost"], e);
     });
 
     api("/api/adsets" + qs).then(function (j) {
       state.adsets = j.rows; renderAdsets();
-    }).catch(function (e) { showError(["adsetHost"], e); });
+    }).catch(function (e) {
+      if (isLocked(e)) return showGate();
+      showError(["adsetHost"], e);
+    });
 
     api("/api/log?limit=30").then(function (j) {
       state.log = j.rows; renderLog();
-    }).catch(function (e) { showError(["logHost"], e); });
+    }).catch(function (e) {
+      if (isLocked(e)) return showGate();
+      showError(["logHost"], e);
+    });
   }
 
   function buildRanges() {
@@ -652,9 +734,9 @@
   renderTiles();
   $("heroRange").textContent = LABEL[state.range];
   load();
-  setInterval(load, 300000);
+  setInterval(function () { if (!gateOpen) load(); }, 300000);
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) load();
+    if (!document.hidden && !gateOpen) load();
   });
 })();
 </script>
