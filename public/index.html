@@ -37,30 +37,8 @@
 
   /* One face throughout means figures need explicit tabular alignment. */
   .hero-value,.tile .v,.log-metrics,.tooltip,.tick,.log-date{font-variant-numeric:tabular-nums}
-  .ranges{display:flex;gap:4px;flex-wrap:wrap}
-  .range-btn{
-    font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.03em;
-    padding:5px 9px;border-radius:var(--radius-sm);border:1px solid transparent;
-    background:transparent;color:var(--ink-2);cursor:pointer;
-  }
-  .range-btn:hover{background:var(--accent-soft);color:var(--ink)}
-  .range-btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-  .range-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  /* Custom range sits on its own row under the presets so the topbar never
-     has to squeeze two date fields in beside the logo on a phone. */
-  .custom-range{flex-basis:100%;display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-  .custom-range label{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
-  /* 16px on the inputs keeps iOS from zooming when a field takes focus. */
-  .custom-range input{font:inherit;font-size:16px;padding:5px 8px;border:1px solid var(--rule);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);min-width:0}
-  .custom-range input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
-  .custom-apply{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;padding:7px 12px;border-radius:var(--radius-sm);border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
-  .custom-apply:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .custom-err{font-size:11px;color:var(--critical);flex-basis:100%;text-align:right;min-height:0}
-  .custom-err:empty{display:none}
-  @media (max-width:560px){ .custom-range{justify-content:flex-start} .custom-err{text-align:left} }
-  .freshness{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.03em}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
-  .dot.live{background:var(--good)} .dot.stale{background:var(--warning)} .dot.down{background:var(--critical)}
+  /* Range controls, freshness dot and the login gate now live in app.css,
+     shared with /explore. */
 
   .hero{
     background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
@@ -206,6 +184,10 @@
       <h1>Ads</h1>
       <span class="acct">MY &middot; MYR &middot; Meta</span>
     </div>
+    <nav class="tabs" aria-label="Views">
+      <a class="tab" href="/" aria-current="page">Dashboard</a>
+      <a class="tab" href="/explore">Explore</a>
+    </nav>
     <div class="ranges" id="ranges" role="group" aria-label="Date range"></div>
     <div class="freshness"><span class="dot" id="dot"></span><span id="fresh">Loading</span></div>
     <form class="custom-range" id="customRange" hidden>
@@ -214,10 +196,6 @@
       <button type="submit" class="custom-apply">Apply</button>
       <div class="custom-err" id="customErr" role="alert"></div>
     </form>
-    <nav class="tabs" aria-label="Views">
-      <a class="tab" href="/" aria-current="page">Dashboard</a>
-      <a class="tab" href="/explore">Explore</a>
-    </nav>
   </div>
 </div>
 

@@ -551,9 +551,33 @@ app.get("/api/entity", async (req, res, next) => {
   }
   try {
     const { rows, cachedAt } = await allAdsetRows();
-    const mine = rows.filter((r) => (level === "campaign" ? r.campaignId === id : r.adsetId === id));
-    if (!mine.length) {
+    const all = rows.filter((r) => (level === "campaign" ? r.campaignId === id : r.adsetId === id));
+    if (!all.length) {
       return res.status(404).json({ error: { code: "not_found", message: "Nothing recorded for that id." } });
+    }
+
+    // The entity's own lifetime is reported whatever window is applied, so the
+    // page can always say when it launched and last ran.
+    const lifetime = rollUp(all);
+
+    const since = isISO(req.query.since) ? req.query.since : null;
+    const until = isISO(req.query.until) ? req.query.until : null;
+    const mine = all.filter((r) => (!since || r.date >= since) && (!until || r.date <= until));
+
+    if (!mine.length) {
+      return res.json({
+        entity: {
+          id, level,
+          name: level === "campaign" ? all[all.length - 1].campaign : all[all.length - 1].adset,
+          campaign: all[all.length - 1].campaign, campaignId: all[all.length - 1].campaignId,
+          objective: all[all.length - 1].objective, status: all[all.length - 1].status,
+          purchaseOptimised: isPurchaseObjective(all[all.length - 1].objective),
+        },
+        lifetime, window: { since, until },
+        totals: rollUp([]), daily: [], children: [],
+        emptyWindow: true,
+        cachedAt,
+      });
     }
 
     const last = mine[mine.length - 1];
@@ -585,6 +609,9 @@ app.get("/api/entity", async (req, res, next) => {
         objective: last.objective, status: last.status,
         purchaseOptimised: isPurchaseObjective(last.objective),
       },
+      lifetime,
+      window: { since, until },
+      emptyWindow: false,
       totals: rollUp(mine),
       daily,
       children,

@@ -37,9 +37,16 @@
     background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
     padding:20px;margin-top:10px;
   }
-  .ent-title{font-size:20px;font-weight:700;margin:0 0 6px;letter-spacing:-.015em;overflow-wrap:anywhere}
-  .ent-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--ink-2)}
-  .ent-meta .sep{color:var(--rule)}
+  .ent-title{font-size:20px;font-weight:700;margin:0 0 10px;letter-spacing:-.015em;overflow-wrap:anywhere}
+  .ent-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .facts{
+    display:grid;gap:12px 22px;margin:0;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  }
+  .facts div{min-width:0}
+  .facts dt{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:3px}
+  .facts dd{margin:0;font-size:13px;font-weight:500;overflow-wrap:anywhere}
+  .window-note{margin:14px 0 0;font-size:12px;color:var(--ink-2);padding-top:12px;border-top:1px solid var(--grid)}
 
   .chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:4px;white-space:nowrap}
   .chip.good{background:var(--good-wash);color:var(--ink)}
@@ -120,11 +127,18 @@
       <h1>Ads</h1>
       <span class="acct">MY &middot; MYR &middot; Meta</span>
     </div>
-    <div class="freshness"><span class="dot" id="dot"></span><span id="fresh">Loading</span></div>
     <nav class="tabs" aria-label="Views">
       <a class="tab" href="/">Dashboard</a>
       <a class="tab" href="/explore" aria-current="page">Explore</a>
     </nav>
+    <div class="ranges" id="ranges" role="group" aria-label="Date range"></div>
+    <div class="freshness"><span class="dot" id="dot"></span><span id="fresh">Loading</span></div>
+    <form class="custom-range" id="customRange" hidden>
+      <label>From <input type="date" id="customSince" required></label>
+      <label>To <input type="date" id="customUntil" required></label>
+      <button type="submit" class="custom-apply">Apply</button>
+      <div class="custom-err" id="customErr" role="alert"></div>
+    </form>
   </div>
 </div>
 
@@ -191,8 +205,41 @@
   "use strict";
 
   var TARGET_CAC = 20, FIRST_ORDER_BE = 42, LIFETIME_CEIL = 55;
-  var state = { level: "adset", id: null, entities: null };
+
+  // "All time" is the default here on purpose: the whole point of this page is
+  // seeing things the dashboard's rolling window hides.
+  var RANGES = [
+    { id: "all",      label: "All time" },
+    { id: "last_7d",  label: "7D",  days: 7 },
+    { id: "last_30d", label: "30D", days: 30 },
+    { id: "last_90d", label: "90D", days: 90 },
+    { id: "custom",   label: "Custom" }
+  ];
+
+  var state = { level: "adset", id: null, entities: null, range: "all", since: null, until: null };
   var $ = function (id) { return document.getElementById(id); };
+
+  function todayISO() { return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10); }
+  function shiftDay(iso, d) {
+    var x = new Date(iso + "T00:00:00Z");
+    x.setUTCDate(x.getUTCDate() + d);
+    return x.toISOString().slice(0, 10);
+  }
+  function rangeQuery() {
+    if (state.range === "all") return "";
+    if (state.range === "custom") {
+      return state.since && state.until ? "&since=" + state.since + "&until=" + state.until : "";
+    }
+    var days = RANGES.filter(function (r) { return r.id === state.range; })[0].days;
+    var until = todayISO();
+    return "&since=" + shiftDay(until, -(days - 1)) + "&until=" + until;
+  }
+  function rangeLabel() {
+    if (state.range === "all") return "its whole life";
+    if (state.range === "custom" && state.since) return state.since + " to " + state.until;
+    var r = RANGES.filter(function (x) { return x.id === state.range; })[0];
+    return "the last " + r.days + " days";
+  }
 
   function fmt(n, dp) {
     if (n === null || n === undefined || !isFinite(n)) return "—";
@@ -203,6 +250,12 @@
     if (p.length !== 3) return iso;
     var M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return parseInt(p[2], 10) + " " + M[parseInt(p[1], 10) - 1];
+  }
+  function longDate(iso) {
+    var p = String(iso || "").split("-");
+    if (p.length !== 3) return "—";
+    var M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return parseInt(p[2], 10) + " " + M[parseInt(p[1], 10) - 1] + " " + p[0];
   }
   function esc(s) {
     return String(s === null || s === undefined ? "" : s)
@@ -397,14 +450,48 @@
     $("entityView").hidden = false;
     var e = j.entity, t = j.totals;
 
+    var life = j.lifetime || t;
+    // Remembered so the Custom fields can be seeded with this entity's own span.
+    state.lifeFirst = life.firstDate; state.lifeLast = life.lastDate;
     $("entTitle").textContent = e.name;
+
     var sev = severity(t.cac);
-    var meta = [];
-    meta.push('<span class="chip ' + sev + '"><i class="ico"></i>' + esc(severityWord(sev)) + "</span>");
-    if (e.status) meta.push('<span class="chip neutral"><i class="ico"></i>' + esc(e.status) + "</span>");
-    if (e.level === "adset" && e.campaign) meta.push("<span>in " + esc(e.campaign) + "</span>");
-    if (t.firstDate) meta.push('<span class="sep">|</span><span>' + esc(shortDate(t.firstDate)) + " – " + esc(shortDate(t.lastDate)) + " · " + t.days + " day" + (t.days === 1 ? "" : "s") + " with spend</span>");
-    $("entMeta").innerHTML = meta.join(" ");
+    var chips = ['<span class="chip ' + sev + '"><i class="ico"></i>' + esc(severityWord(sev)) + "</span>"];
+    if (e.status) chips.push('<span class="chip neutral"><i class="ico"></i>' + esc(e.status) + "</span>");
+
+    // Launch and last-run always describe the entity's whole life, never the
+    // selected window -- otherwise narrowing the dates would appear to change
+    // when something launched.
+    var facts = [
+      { k: e.level === "campaign" ? "Ad sets" : "Campaign",
+        v: e.level === "campaign"
+             ? String((j.children || []).length)
+             : (e.campaign || "— not recorded yet") },
+      { k: "Launched",  v: life.firstDate ? longDate(life.firstDate) : "—" },
+      { k: "Last ran",  v: life.lastDate ? longDate(life.lastDate) : "—" },
+      { k: "Days with spend", v: life.days + " of its life" }
+    ];
+
+    $("entMeta").innerHTML =
+      '<div class="ent-chips">' + chips.join(" ") + "</div>" +
+      '<dl class="facts">' + facts.map(function (f) {
+        return "<div><dt>" + esc(f.k) + "</dt><dd>" + esc(f.v) + "</dd></div>";
+      }).join("") + "</dl>" +
+      (state.range === "all"
+        ? ""
+        : '<p class="window-note">Figures below cover <b>' + esc(rangeLabel()) + "</b>, not its whole life.</p>");
+
+    if (j.emptyWindow) {
+      $("tiles").innerHTML = "";
+      $("cacHost").innerHTML = '<div class="state"><b>Nothing in this window</b>This one ran ' +
+        esc(longDate(life.firstDate)) + " – " + esc(longDate(life.lastDate)) +
+        ". Switch to All time, or widen the dates.</div>";
+      $("spendHost").innerHTML = "";
+      $("childSec").hidden = true;
+      var w0 = document.querySelector(".picker .warn");
+      if (w0) w0.remove();
+      return;
+    }
 
     // A messaging or content-view ad set has a cost per result, but it is not a
     // CAC. Saying so plainly is the whole reason Objective is stored.
@@ -486,7 +573,7 @@
       $("emptyView").hidden = false;
       return;
     }
-    api("/api/entity?level=" + encodeURIComponent(state.level) + "&id=" + encodeURIComponent(state.id))
+    api("/api/entity?level=" + encodeURIComponent(state.level) + "&id=" + encodeURIComponent(state.id) + rangeQuery())
       .then(function (j) {
         renderEntity(j);
         var d = new Date(j.cachedAt || Date.now());
@@ -508,6 +595,14 @@
     var u = new URL(window.location.href);
     if (state.id) { u.searchParams.set("level", state.level); u.searchParams.set("id", state.id); }
     else { u.searchParams.delete("level"); u.searchParams.delete("id"); }
+    if (state.range && state.range !== "all") u.searchParams.set("range", state.range);
+    else u.searchParams.delete("range");
+    if (state.range === "custom" && state.since) {
+      u.searchParams.set("since", state.since);
+      u.searchParams.set("until", state.until);
+    } else {
+      u.searchParams.delete("since"); u.searchParams.delete("until");
+    }
     history.replaceState(null, "", u.toString());
   }
 
@@ -532,6 +627,58 @@
     });
   }
 
+  /* ---------- date range ---------- */
+  function markRange() {
+    Array.prototype.forEach.call($("ranges").children, function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.range === state.range));
+    });
+    $("customRange").hidden = state.range !== "custom";
+  }
+
+  function buildRanges() {
+    var host = $("ranges");
+    host.innerHTML = "";
+    RANGES.forEach(function (r) {
+      var b = document.createElement("button");
+      b.className = "range-btn";
+      b.type = "button";
+      b.textContent = r.label;
+      b.dataset.range = r.id;
+      b.addEventListener("click", function () {
+        if (r.id === "custom") {
+          state.range = "custom";
+          markRange();
+          // Seed the fields from the entity's own life so Apply is one click.
+          if (!$("customSince").value && state.lifeFirst) {
+            $("customSince").value = state.lifeFirst;
+            $("customUntil").value = state.lifeLast || todayISO();
+          }
+          return;
+        }
+        if (state.range === r.id) return;
+        state.range = r.id;
+        state.since = state.until = null;
+        markRange();
+        syncUrl();
+        loadEntity();
+      });
+      host.appendChild(b);
+    });
+    markRange();
+  }
+
+  $("customRange").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var a = $("customSince").value, b = $("customUntil").value, err = $("customErr");
+    if (!a || !b) { err.textContent = "Pick both dates."; return; }
+    if (a > b) { err.textContent = "From is after To."; return; }
+    err.textContent = "";
+    state.range = "custom"; state.since = a; state.until = b;
+    markRange();
+    syncUrl();
+    loadEntity();
+  });
+
   $("levelSel").addEventListener("change", function () {
     state.level = this.value;
     state.id = null;
@@ -545,12 +692,20 @@
     loadEntity();
   });
 
-  // Deep links: /explore?level=campaign&id=... opens straight onto that entity.
+  // Deep links: /explore?level=campaign&id=…&range=custom&since=…&until=…
   var q = new URLSearchParams(window.location.search);
   if (q.get("level") === "campaign" || q.get("level") === "adset") state.level = q.get("level");
   if (q.get("id")) state.id = q.get("id");
+  if (RANGES.some(function (r) { return r.id === q.get("range"); })) state.range = q.get("range");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(q.get("since") || "") && /^\d{4}-\d{2}-\d{2}$/.test(q.get("until") || "")) {
+    state.since = q.get("since"); state.until = q.get("until");
+    state.range = "custom";
+    $("customSince").value = state.since;
+    $("customUntil").value = state.until;
+  }
   $("levelSel").value = state.level;
 
+  buildRanges();
   loadEntities();
 })();
 </script>
