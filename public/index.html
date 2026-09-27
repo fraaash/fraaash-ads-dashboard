@@ -88,6 +88,18 @@
   .range-btn:hover{background:var(--accent-soft);color:var(--ink)}
   .range-btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
   .range-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* Custom range sits on its own row under the presets so the topbar never
+     has to squeeze two date fields in beside the logo on a phone. */
+  .custom-range{flex-basis:100%;display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+  .custom-range label{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+  /* 16px on the inputs keeps iOS from zooming when a field takes focus. */
+  .custom-range input{font:inherit;font-size:16px;padding:5px 8px;border:1px solid var(--rule);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);min-width:0}
+  .custom-range input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .custom-apply{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;padding:7px 12px;border-radius:var(--radius-sm);border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+  .custom-apply:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .custom-err{font-size:11px;color:var(--critical);flex-basis:100%;text-align:right;min-height:0}
+  .custom-err:empty{display:none}
+  @media (max-width:560px){ .custom-range{justify-content:flex-start} .custom-err{text-align:left} }
   .freshness{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.03em}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
   .dot.live{background:var(--good)} .dot.stale{background:var(--warning)} .dot.down{background:var(--critical)}
@@ -238,6 +250,12 @@
     </div>
     <div class="ranges" id="ranges" role="group" aria-label="Date range"></div>
     <div class="freshness"><span class="dot" id="dot"></span><span id="fresh">Loading</span></div>
+    <form class="custom-range" id="customRange" hidden>
+      <label>From <input type="date" id="customSince" required></label>
+      <label>To <input type="date" id="customUntil" required></label>
+      <button type="submit" class="custom-apply">Apply</button>
+      <div class="custom-err" id="customErr" role="alert"></div>
+    </form>
   </div>
 </div>
 
@@ -321,17 +339,21 @@
   var TARGET_CAC = 20, FIRST_ORDER_BE = 42, LIFETIME_CEIL = 55;
   var SCALE_MAX = 70, LIFETIME_GP = 57.63, BUDGET_CAP = 210;
 
+  // `back` shifts the window's end day: yesterday is a 1-day window ending a
+  // day before today. "custom" has no fixed window -- it reads state.custom.
   var RANGES = [
-    { id: "today",    label: "Today", days: 1 },
-    { id: "last_7d",  label: "7D",    days: 7 },
-    { id: "last_14d", label: "14D",   days: 14 },
-    { id: "last_30d", label: "30D",   days: 30 },
-    { id: "last_90d", label: "90D",   days: 90 }
+    { id: "today",     label: "Today",     days: 1 },
+    { id: "yesterday", label: "Yesterday", days: 1, back: 1 },
+    { id: "last_7d",   label: "7D",        days: 7 },
+    { id: "last_14d",  label: "14D",       days: 14 },
+    { id: "last_30d",  label: "30D",       days: 30 },
+    { id: "last_90d",  label: "90D",       days: 90 },
+    { id: "custom",    label: "Custom" }
   ];
-  var LABEL = { today: "today", last_7d: "last 7 days", last_14d: "last 14 days",
-                last_30d: "last 30 days", last_90d: "last 90 days" };
+  var LABEL = { today: "today", yesterday: "yesterday", last_7d: "last 7 days",
+                last_14d: "last 14 days", last_30d: "last 30 days", last_90d: "last 90 days" };
 
-  var state = { range: "last_7d", daily: null, totals: null, adsets: null, log: null, stamp: null };
+  var state = { range: "last_7d", custom: null, daily: null, totals: null, adsets: null, log: null, stamp: null };
   var $ = function (id) { return document.getElementById(id); };
 
   /* ---------- dates (business runs on Malaysia time) ---------- */
@@ -342,9 +364,15 @@
     return x.toISOString().slice(0, 10);
   }
   function window_() {
-    var until = todayISO();
-    var days = RANGES.filter(function (r) { return r.id === state.range; })[0].days;
-    return { since: shiftDay(until, -(days - 1)), until: until };
+    if (state.range === "custom" && state.custom) return state.custom;
+    var r = RANGES.filter(function (x) { return x.id === state.range; })[0];
+    var until = shiftDay(todayISO(), -(r.back || 0));
+    return { since: shiftDay(until, -(r.days - 1)), until: until };
+  }
+  function rangeLabel() {
+    if (state.range !== "custom" || !state.custom) return LABEL[state.range];
+    var c = state.custom;
+    return c.since === c.until ? shortDate(c.since) : shortDate(c.since) + " – " + shortDate(c.until);
   }
 
   /* ---------- formatting ---------- */
@@ -438,7 +466,7 @@
   function renderTiles() {
     var t = state.totals;
     var defs = [
-      { k:"Ad spend",  v: t ? "RM" + fmt(t.spend, 2) : null, d: LABEL[state.range] },
+      { k:"Ad spend",  v: t ? "RM" + fmt(t.spend, 2) : null, d: rangeLabel() },
       { k:"Purchases", v: t ? String(t.purchases) : null,    d:"new customers" },
       { k:"CAC",       v: t ? (t.cac === null ? "—" : "RM" + fmt(t.cac, 2)) : null, d:"goal RM20" },
       { k:"CTR",       v: t ? (t.ctr === null ? "—" : fmt(t.ctr, 2) + "%") : null,  d:"all placements" },
@@ -737,6 +765,44 @@
     });
   }
 
+  function applyRange(id) {
+    state.range = id;
+    Array.prototype.forEach.call($("ranges").children, function (c) {
+      c.setAttribute("aria-pressed", String(c.id === "range-" + id));
+    });
+    $("heroRange").textContent = rangeLabel();
+    state.daily = state.totals = state.adsets = null;
+    $("heroCac").className = "skel";
+    $("cacHost").innerHTML = '<div class="state">Loading&hellip;</div>';
+    $("spendHost").innerHTML = '<div class="state">Loading&hellip;</div>';
+    $("adsetHost").innerHTML = '<div class="state">Loading&hellip;</div>';
+    renderTiles();
+    load();
+  }
+
+  function openCustom() {
+    var form = $("customRange"), cur = window_();
+    // Pre-fill with whatever is on screen, so tweaking one end is one edit.
+    $("customSince").value = cur.since;
+    $("customUntil").value = cur.until;
+    $("customSince").max = $("customUntil").max = todayISO();
+    $("customErr").textContent = "";
+    form.hidden = false;
+    $("customSince").focus();
+  }
+
+  $("customRange").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var s = $("customSince").value, u = $("customUntil").value, err = $("customErr");
+    if (!s || !u) { err.textContent = "Pick both dates."; return; }
+    if (s > u) { var t = s; s = u; u = t; }
+    if (u > todayISO()) { err.textContent = "The end date can't be in the future."; return; }
+    err.textContent = "";
+    state.custom = { since: s, until: u };
+    $("customRange").hidden = true;
+    applyRange("custom");
+  });
+
   function buildRanges() {
     var host = $("ranges");
     RANGES.forEach(function (r) {
@@ -745,19 +811,14 @@
       b.id = "range-" + r.id;
       b.setAttribute("aria-pressed", String(r.id === state.range));
       b.addEventListener("click", function () {
+        if (r.id === "custom") {
+          // Toggle the picker; the range only changes once Apply is pressed.
+          if (!$("customRange").hidden) { $("customRange").hidden = true; return; }
+          return openCustom();
+        }
+        $("customRange").hidden = true;
         if (state.range === r.id) return;
-        state.range = r.id;
-        Array.prototype.forEach.call(host.children, function (c) {
-          c.setAttribute("aria-pressed", String(c.id === "range-" + r.id));
-        });
-        $("heroRange").textContent = LABEL[r.id];
-        state.daily = state.totals = state.adsets = null;
-        $("heroCac").className = "skel";
-        $("cacHost").innerHTML = '<div class="state">Loading&hellip;</div>';
-        $("spendHost").innerHTML = '<div class="state">Loading&hellip;</div>';
-        $("adsetHost").innerHTML = '<div class="state">Loading&hellip;</div>';
-        renderTiles();
-        load();
+        applyRange(r.id);
       });
       host.appendChild(b);
     });
@@ -765,7 +826,7 @@
 
   buildRanges();
   renderTiles();
-  $("heroRange").textContent = LABEL[state.range];
+  $("heroRange").textContent = rangeLabel();
   load();
   setInterval(function () { if (!gateOpen) load(); }, 300000);
   document.addEventListener("visibilitychange", function () {
