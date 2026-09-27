@@ -7,52 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<!-- Brand tokens, base reset, top bar, tabs and the login gate live in app.css
+     so this page and /explore cannot drift apart. -->
+<link rel="stylesheet" href="/app.css">
 <style>
-  /* Brand: --color-primary-rgb "10 104 54" from the fraaash.com Shopify theme,
-     i.e. #0a6836, and Inter as the storefront's UI face. Brand green doubles as
-     the "on target" status, so nothing on screen is green except good news --
-     trouble escalates through amber, coral, red. */
-  :root {
-    color-scheme: light;
-    --plane:#F1F3F0; --surface:#FDFDFC; --surface-sunk:#F5F7F3;
-    --ink:#101511; --ink-2:#4E5A52; --muted:#86908A;
-    --grid:#E3E6E0; --rule:#D8DCD5; --hairline:rgba(16,21,17,.10);
-    --brand:#0a6836;
-    --accent:#0a6836; --accent-soft:rgba(10,104,54,.10); --accent-ink:#fff;
-    --good:#0a6836; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
-    --good-wash:rgba(10,104,54,.12); --warning-wash:rgba(250,178,25,.16);
-    --serious-wash:rgba(236,131,90,.16); --critical-wash:rgba(208,59,59,.12);
-    --radius:10px; --radius-sm:6px;
-    --ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
-    /* One face throughout, as the storefront does. Figures line up through
-       tabular-nums rather than by swapping in a second, off-brand family. */
-    --mono:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
-  }
-  /* #0a6836 is too dark to read on a dark ground, so the dark theme steps the
-     same hue up to #3E9E62 rather than inventing a different colour. */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --plane:#0A0F0C; --surface:#141A16; --surface-sunk:#0F1511;
-      --ink:#E9EEEA; --ink-2:#A6B3AB; --muted:#7C8882;
-      --grid:#222B25; --rule:#2A342E; --hairline:rgba(233,238,234,.12);
-      --accent:#3E9E62; --accent-soft:rgba(62,158,98,.16); --accent-ink:#06180E;
-      --good:#3E9E62;
-      --good-wash:rgba(62,158,98,.20); --warning-wash:rgba(250,178,25,.20);
-      --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
-    }
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --plane:#0A0F0C; --surface:#141A16; --surface-sunk:#0F1511;
-    --ink:#E9EEEA; --ink-2:#A6B3AB; --muted:#7C8882;
-    --grid:#222B25; --rule:#2A342E; --hairline:rgba(233,238,234,.12);
-    --accent:#3E9E62; --accent-soft:rgba(62,158,98,.16); --accent-ink:#06180E;
-    --good:#3E9E62;
-    --good-wash:rgba(62,158,98,.20); --warning-wash:rgba(250,178,25,.20);
-    --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
-  }
-
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
@@ -256,6 +214,10 @@
       <button type="submit" class="custom-apply">Apply</button>
       <div class="custom-err" id="customErr" role="alert"></div>
     </form>
+    <nav class="tabs" aria-label="Views">
+      <a class="tab" href="/" aria-current="page">Dashboard</a>
+      <a class="tab" href="/explore">Explore</a>
+    </nav>
   </div>
 </div>
 

@@ -432,6 +432,169 @@ app.get("/api/adsets", async (req, res, next) => {
   }
 });
 
+/* ------------------------------------------------------------------ *
+ * Explore: every campaign and ad set ever recorded, active or not.
+ *
+ * The dashboard deliberately shows only what spent inside the selected
+ * window, which means a paused ad set vanishes from it. These two
+ * endpoints exist so nothing is lost -- they read the whole table and
+ * ignore the date window entirely.
+ * ------------------------------------------------------------------ */
+
+function normaliseAdsetRow(f) {
+  return {
+    date: f.Date,
+    adsetId: String(f["Ad Set ID"] || ""),
+    adset: f["Ad Set"] || "Untitled",
+    campaignId: String(f["Campaign ID"] || ""),
+    campaign: f.Campaign || "",
+    objective: f.Objective || "",
+    status: f.Status || "",
+    spend: n0(f.Spend),
+    purchases: n0(f.Purchases),
+    impressions: n0(f.Impressions),
+    clicks: n0(f.Clicks),
+    roas: n(f.ROAS),
+  };
+}
+
+// Purchases are only meaningful for purchase-optimised ad sets. Anything else
+// counted conversations or content views, and calling that a CAC would be a lie.
+const isPurchaseObjective = (o) => !o || /OFFSITE_CONVERSIONS|PURCHASE|VALUE/i.test(o);
+
+function rollUp(rows) {
+  const t = rows.reduce(
+    (a, r) => {
+      a.spend += r.spend;
+      a.purchases += r.purchases;
+      a.impressions += r.impressions;
+      a.clicks += r.clicks;
+      if (r.roas !== null) a.revenue += r.roas * r.spend;
+      return a;
+    },
+    { spend: 0, purchases: 0, impressions: 0, clicks: 0, revenue: 0 }
+  );
+  const dates = rows.map((r) => r.date).filter(isISO).sort();
+  return {
+    spend: t.spend,
+    purchases: t.purchases,
+    impressions: t.impressions,
+    clicks: t.clicks,
+    cac: t.purchases > 0 ? t.spend / t.purchases : null,
+    ctr: t.impressions > 0 ? (t.clicks / t.impressions) * 100 : null,
+    roas: t.spend > 0 && t.revenue > 0 ? t.revenue / t.spend : null,
+    aov: t.purchases > 0 && t.revenue > 0 ? t.revenue / t.purchases : null,
+    days: new Set(dates).size,
+    firstDate: dates[0] || null,
+    lastDate: dates[dates.length - 1] || null,
+  };
+}
+
+function allAdsetRows() {
+  return cached("allAdsets", async () => {
+    const recs = await airtable(TABLE.adsets, [
+      ["sort[0][field]", "Date"],
+      ["sort[0][direction]", "asc"],
+    ]);
+    return { rows: recs.map((r) => normaliseAdsetRow(r.fields || {})).filter((r) => isISO(r.date)) };
+  });
+}
+
+app.get("/api/entities", async (_req, res, next) => {
+  try {
+    const { rows, cachedAt } = await allAdsetRows();
+
+    const group = (keyFn, labelFn) => {
+      const m = new Map();
+      for (const r of rows) {
+        const k = keyFn(r);
+        if (!k) continue;
+        if (!m.has(k)) m.set(k, []);
+        m.get(k).push(r);
+      }
+      return [...m.entries()]
+        .map(([id, rs]) => {
+          const last = rs[rs.length - 1];
+          return Object.assign(
+            { id, name: labelFn(last), objective: last.objective, status: last.status,
+              purchaseOptimised: isPurchaseObjective(last.objective) },
+            rollUp(rs)
+          );
+        })
+        .sort((a, b) => (b.lastDate || "").localeCompare(a.lastDate || "") || b.spend - a.spend);
+    };
+
+    const campaigns = group((r) => r.campaignId, (r) => r.campaign || "Untitled campaign");
+    const adsets = group((r) => r.adsetId, (r) => r.adset).map((a) => {
+      const row = rows.find((r) => r.adsetId === a.id);
+      return Object.assign(a, { campaign: row ? row.campaign : "", campaignId: row ? row.campaignId : "" });
+    });
+
+    res.json({
+      campaigns,
+      adsets,
+      // Populated by the one-time backfill; until it runs, campaigns will be empty.
+      campaignsAvailable: campaigns.length > 0,
+      coverage: rollUp(rows),
+      cachedAt,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/entity", async (req, res, next) => {
+  const level = req.query.level === "campaign" ? "campaign" : "adset";
+  const id = String(req.query.id || "");
+  if (!id) {
+    return res.status(400).json({ error: { code: "no_id", message: "Pass an id." } });
+  }
+  try {
+    const { rows, cachedAt } = await allAdsetRows();
+    const mine = rows.filter((r) => (level === "campaign" ? r.campaignId === id : r.adsetId === id));
+    if (!mine.length) {
+      return res.status(404).json({ error: { code: "not_found", message: "Nothing recorded for that id." } });
+    }
+
+    const last = mine[mine.length - 1];
+    const byDate = new Map();
+    for (const r of mine) {
+      if (!byDate.has(r.date)) byDate.set(r.date, []);
+      byDate.get(r.date).push(r);
+    }
+    const daily = [...byDate.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, rs]) => Object.assign({ date }, rollUp(rs)));
+
+    // A campaign is worth breaking down; a single ad set is already the leaf.
+    const children =
+      level === "campaign"
+        ? [...new Set(mine.map((r) => r.adsetId))]
+            .map((aid) => {
+              const rs = mine.filter((r) => r.adsetId === aid);
+              return Object.assign({ id: aid, name: rs[rs.length - 1].adset, status: rs[rs.length - 1].status }, rollUp(rs));
+            })
+            .sort((a, b) => b.spend - a.spend)
+        : [];
+
+    res.json({
+      entity: {
+        id, level,
+        name: level === "campaign" ? last.campaign : last.adset,
+        campaign: last.campaign, campaignId: last.campaignId,
+        objective: last.objective, status: last.status,
+        purchaseOptimised: isPurchaseObjective(last.objective),
+      },
+      totals: rollUp(mine),
+      daily,
+      children,
+      cachedAt,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.get("/api/log", async (req, res, next) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 30, 1), 100);
   try {
@@ -481,6 +644,12 @@ app.get("/api/log", async (req, res, next) => {
 /* ------------------------------------------------------------------ *
  * Static + errors
  * ------------------------------------------------------------------ */
+
+// Clean URL for the second view. The file stays at /explore.html; this just
+// means the tab links, bookmarks and shared links read as /explore.
+app.get("/explore", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "explore.html"));
+});
 
 app.use(express.static(path.join(__dirname, "public"), { maxAge: "1h" }));
 

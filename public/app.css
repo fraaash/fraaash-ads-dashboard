@@ -1,0 +1,102 @@
+/* Shared chrome for every page: brand tokens, base reset, top bar, tabs.
+   Page-specific components stay in each page's own <style> block.
+
+   Brand: --color-primary-rgb "10 104 54" from the fraaash.com Shopify theme,
+   i.e. #0a6836, and Inter as the storefront's UI face. Brand green doubles as
+   the "on target" status, so nothing on screen is green except good news --
+   trouble escalates through amber, coral, red. */
+
+:root {
+  color-scheme: light;
+  --plane:#F1F3F0; --surface:#FDFDFC; --surface-sunk:#F5F7F3;
+  --ink:#101511; --ink-2:#4E5A52; --muted:#86908A;
+  --grid:#E3E6E0; --rule:#D8DCD5; --hairline:rgba(16,21,17,.10);
+  --brand:#0a6836;
+  --accent:#0a6836; --accent-soft:rgba(10,104,54,.10); --accent-ink:#fff;
+  --good:#0a6836; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  --good-wash:rgba(10,104,54,.12); --warning-wash:rgba(250,178,25,.16);
+  --serious-wash:rgba(236,131,90,.16); --critical-wash:rgba(208,59,59,.12);
+  --radius:10px; --radius-sm:6px;
+  --ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  /* One face throughout, as the storefront does. Figures line up through
+     tabular-nums rather than by swapping in a second, off-brand family. */
+  --mono:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+/* #0a6836 is too dark to read on a dark ground, so the dark theme steps the
+   same hue up to #3E9E62 rather than inventing a different colour. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --plane:#0A0F0C; --surface:#141A16; --surface-sunk:#0F1511;
+    --ink:#E9EEEA; --ink-2:#A6B3AB; --muted:#7C8882;
+    --grid:#222B25; --rule:#2A342E; --hairline:rgba(233,238,234,.12);
+    --accent:#3E9E62; --accent-soft:rgba(62,158,98,.16); --accent-ink:#06180E;
+    --good:#3E9E62;
+    --good-wash:rgba(62,158,98,.20); --warning-wash:rgba(250,178,25,.20);
+    --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:#0A0F0C; --surface:#141A16; --surface-sunk:#0F1511;
+  --ink:#E9EEEA; --ink-2:#A6B3AB; --muted:#7C8882;
+  --grid:#222B25; --rule:#2A342E; --hairline:rgba(233,238,234,.12);
+  --accent:#3E9E62; --accent-soft:rgba(62,158,98,.16); --accent-ink:#06180E;
+  --good:#3E9E62;
+  --good-wash:rgba(62,158,98,.20); --warning-wash:rgba(250,178,25,.20);
+  --serious-wash:rgba(236,131,90,.20); --critical-wash:rgba(208,59,59,.22);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--plane); color:var(--ink); font-family:var(--ui);
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+
+.topbar{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:30;
+  background:color-mix(in srgb,var(--plane) 88%,transparent);
+  backdrop-filter:blur(12px); border-bottom:1px solid var(--rule);
+  padding-inline:16px; padding-block:12px;
+}
+.topbar-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;margin-right:auto;min-width:0}
+.brand img{height:19px;width:auto;display:block;flex:none}
+.brand h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em;color:var(--ink-2)}
+.brand .acct{font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+@media (max-width:560px){ .brand .acct{display:none} }
+
+/* Page tabs. Real links to real URLs, so back/forward and bookmarks work and
+   each view can be sent to someone directly. */
+.tabs{flex-basis:100%;order:10;display:flex;gap:2px;border-top:1px solid var(--rule);margin-top:10px;padding-top:8px}
+.tab{
+  font-size:12.5px;font-weight:600;letter-spacing:-.005em;
+  padding:6px 12px;border-radius:var(--radius-sm);
+  color:var(--ink-2);text-decoration:none;white-space:nowrap;
+}
+.tab:hover{background:var(--accent-soft);color:var(--ink)}
+.tab[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.freshness{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.03em}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+.dot.live{background:var(--good)} .dot.stale{background:var(--warning)} .dot.down{background:var(--critical)}
+
+/* Shared login gate -- both pages sit behind the same password. */
+.login-gate{position:fixed;inset:0;z-index:100;background:var(--plane);display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:30px 26px;max-width:340px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.12)}
+.login-brand{margin-bottom:16px}
+.login-brand img{height:26px;width:auto;display:block}
+.login-card h2{font-size:19px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
+.login-card p{color:var(--ink-2);font-size:13px;margin:0 0 18px}
+/* 16px keeps iOS from zooming the page when the field takes focus. */
+.login-card input{width:100%;padding:11px 13px;border:1px solid var(--rule);border-radius:var(--radius-sm);font:inherit;font-size:16px;background:var(--surface-sunk);color:var(--ink);margin-bottom:10px}
+.login-card input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+.login-card button{width:100%;padding:11px;border:0;border-radius:var(--radius-sm);background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;font-size:15px;cursor:pointer}
+.login-card button:disabled{opacity:.55;cursor:default}
+.login-err{color:var(--critical);font-size:12.5px;margin-top:10px;min-height:17px}
