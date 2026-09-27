@@ -496,7 +496,29 @@ function allAdsetRows() {
       ["sort[0][field]", "Date"],
       ["sort[0][direction]", "asc"],
     ]);
-    return { rows: recs.map((r) => normaliseAdsetRow(r.fields || {})).filter((r) => isISO(r.date)) };
+    const rows = recs.map((r) => normaliseAdsetRow(r.fields || {})).filter((r) => isISO(r.date));
+
+    // Campaign and Objective were added late, so rows written before then have
+    // them blank. An ad set never changes campaign, so any one row that does
+    // carry them answers for every row of the same ad set. Doing this here
+    // rather than backfilling means the table heals itself as rows arrive,
+    // and campaign totals include days that predate the field.
+    const known = new Map();
+    for (const r of rows) {
+      if (r.campaignId && !known.has(r.adsetId)) {
+        known.set(r.adsetId, { campaignId: r.campaignId, campaign: r.campaign, objective: r.objective });
+      }
+    }
+    for (const r of rows) {
+      if (r.campaignId) continue;
+      const k = known.get(r.adsetId);
+      if (!k) continue;
+      r.campaignId = k.campaignId;
+      r.campaign = k.campaign;
+      if (!r.objective) r.objective = k.objective;
+    }
+
+    return { rows };
   });
 }
 
