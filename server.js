@@ -455,6 +455,15 @@ function normaliseAdsetRow(f) {
     impressions: n0(f.Impressions),
     clicks: n0(f.Clicks),
     roas: n(f.ROAS),
+    // Funnel stages. Link Clicks is written for every row that has funnel data,
+    // so a blank there means the row predates the funnel fields -- it is left
+    // out of funnel maths rather than counted as a day nobody clicked.
+    linkClicks: n(f["Link Clicks"]),
+    lpv: n0(f["Landing Page Views"]),
+    atc: n0(f["Adds to Cart"]),
+    checkouts: n0(f.Checkouts),
+    webPurchases: n0(f["Website Purchases"]),
+    chats: n0(f["Chats Started"]),
   };
 }
 
@@ -644,6 +653,138 @@ app.get("/api/entity", async (req, res, next) => {
   }
 });
 
+/* ------------------------------------------------------------------ *
+ * Funnel: impressions -> link clicks -> landing page -> add to cart ->
+ * checkout -> purchase, for the whole account, one campaign or one ad set.
+ *
+ * Website and WhatsApp ad sets are kept apart. A messaging ad set has no
+ * landing page or cart, so folding its impressions into the website funnel
+ * would make every website step look worse than it is.
+ * ------------------------------------------------------------------ */
+
+const isMessagingObjective = (o) => /CONVERSATION|MESSAG/i.test(o || "");
+
+function funnelOf(rows) {
+  const web = { spend: 0, impressions: 0, linkClicks: 0, lpv: 0, atc: 0, checkouts: 0, purchases: 0 };
+  const chat = { spend: 0, impressions: 0, linkClicks: 0, chats: 0 };
+  let withData = 0;
+  let spendRows = 0;
+
+  for (const r of rows) {
+    if (r.spend > 0) spendRows++;
+    if (r.linkClicks === null) continue;
+    withData++;
+    if (isMessagingObjective(r.objective)) {
+      chat.spend += r.spend;
+      chat.impressions += r.impressions;
+      chat.linkClicks += r.linkClicks;
+      chat.chats += r.chats;
+    } else {
+      web.spend += r.spend;
+      web.impressions += r.impressions;
+      web.linkClicks += r.linkClicks;
+      web.lpv += r.lpv;
+      web.atc += r.atc;
+      web.checkouts += r.checkouts;
+      web.purchases += r.webPurchases;
+    }
+  }
+  return { web, chat, rows: spendRows, rowsWithData: withData };
+}
+
+app.get("/api/funnel", async (req, res, next) => {
+  const { since, until } = range(req);
+  const level = ["campaign", "adset"].includes(req.query.level) ? req.query.level : "all";
+  const id = level === "all" ? "" : String(req.query.id || "");
+  if (level !== "all" && !id) {
+    return res.status(400).json({ error: { code: "no_id", message: "Pass an id." } });
+  }
+
+  try {
+    const { rows, cachedAt } = await allAdsetRows();
+
+    const inScope = (r) =>
+      level === "all" ? true : level === "campaign" ? r.campaignId === id : r.adsetId === id;
+    const scoped = rows.filter(inScope);
+    if (level !== "all" && !scoped.length) {
+      return res.status(404).json({ error: { code: "not_found", message: "Nothing recorded for that id." } });
+    }
+
+    // The same number of days immediately before the window, so every step
+    // can say whether it got better or worse.
+    const days = Math.round((Date.parse(until) - Date.parse(since)) / 86400_000) + 1;
+    const prevUntil = shiftDay(since, -1);
+    const prevSince = shiftDay(prevUntil, -(days - 1));
+
+    const within = (a, b) => (r) => r.date >= a && r.date <= b;
+    const mine = scoped.filter(within(since, until));
+    const before = scoped.filter(within(prevSince, prevUntil));
+
+    // Break the selection down one level: account -> campaigns, campaign -> ad sets.
+    const childKey = level === "all" ? "campaignId" : "adsetId";
+    const childName = level === "all" ? "campaign" : "adset";
+    const groups = new Map();
+    if (level !== "adset") {
+      for (const r of mine) {
+        const k = r[childKey];
+        if (!k) continue;
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(r);
+      }
+    }
+    const breakdown = [...groups.entries()]
+      .map(([cid, rs]) => {
+        const last = rs[rs.length - 1];
+        return Object.assign(
+          { id: cid, level: level === "all" ? "campaign" : "adset",
+            name: last[childName] || "Untitled", status: last.status,
+            messaging: isMessagingObjective(last.objective) },
+          funnelOf(rs)
+        );
+      })
+      .filter((g) => g.web.spend + g.chat.spend > 0)
+      .sort((a, b) => b.web.spend + b.chat.spend - (a.web.spend + a.chat.spend));
+
+    // Dropdown contents: everything that has ever run, most recent first.
+    const pick = (keyFn, nameFn, extra) => {
+      const m = new Map();
+      for (const r of rows) {
+        const k = keyFn(r);
+        if (!k) continue;
+        const cur = m.get(k) || { id: k, name: nameFn(r), lastDate: r.date, spend: 0 };
+        cur.spend += r.spend;
+        if (r.date >= cur.lastDate) { cur.lastDate = r.date; cur.name = nameFn(r) || cur.name; }
+        if (extra) Object.assign(cur, extra(r));
+        m.set(k, cur);
+      }
+      return [...m.values()].sort((a, b) => b.lastDate.localeCompare(a.lastDate) || b.spend - a.spend);
+    };
+
+    const last = scoped.length ? scoped[scoped.length - 1] : null;
+    const funnelDates = rows.filter((r) => r.linkClicks !== null).map((r) => r.date).sort();
+
+    res.json({
+      since, until,
+      previous: Object.assign({ since: prevSince, until: prevUntil }, funnelOf(before)),
+      scope: {
+        level, id,
+        name: level === "all" ? "All campaigns" : level === "campaign" ? last.campaign : last.adset,
+        campaign: last && level === "adset" ? last.campaign : "",
+        campaignId: last && level === "adset" ? last.campaignId : "",
+        messaging: level !== "all" && isMessagingObjective(last.objective),
+      },
+      current: funnelOf(mine),
+      breakdown,
+      campaigns: pick((r) => r.campaignId, (r) => r.campaign || "Untitled campaign"),
+      adsets: pick((r) => r.adsetId, (r) => r.adset, (r) => ({ campaignId: r.campaignId })),
+      funnelFrom: funnelDates[0] || null,
+      cachedAt,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.get("/api/log", async (req, res, next) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 30, 1), 100);
   try {
@@ -698,6 +839,10 @@ app.get("/api/log", async (req, res, next) => {
 // means the tab links, bookmarks and shared links read as /explore.
 app.get("/explore", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "explore.html"));
+});
+
+app.get("/funnel", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "funnel.html"));
 });
 
 app.use(express.static(path.join(__dirname, "public"), { maxAge: "1h" }));

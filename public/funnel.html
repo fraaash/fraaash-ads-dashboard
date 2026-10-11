@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fraaash Ads Funnel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .picker{
+    background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
+    padding:16px;margin-top:20px;display:grid;gap:12px;
+    grid-template-columns:170px minmax(0,1fr);align-items:end;
+  }
+  @media (max-width:620px){ .picker{grid-template-columns:1fr} }
+  .field{display:grid;gap:5px;min-width:0}
+  .field label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  /* 16px stops iOS zooming the page when a select takes focus. */
+  .field select{
+    font:inherit;font-size:16px;padding:9px 11px;width:100%;min-width:0;
+    border:1px solid var(--rule);border-radius:var(--radius-sm);
+    background:var(--surface-sunk);color:var(--ink);
+  }
+  .field select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .picker-note{grid-column:1/-1;font-size:12px;color:var(--muted);margin:0}
+
+  .tiles{display:grid;gap:10px;margin-top:10px;grid-template-columns:repeat(6,minmax(0,1fr))}
+  @media (max-width:900px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .tile{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:12px 13px;min-width:0}
+  .tile .k{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+  .tile .v{font-size:22px;font-weight:600;letter-spacing:-.01em;margin-top:5px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+  .tile .d{font-size:10px;margin-top:3px;color:var(--ink-2)}
+
+  section{margin-top:26px}
+  .sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .sec-head h2{font-size:13px;font-weight:700;margin:0}
+  .sec-head p{margin:0;font-size:12px;color:var(--muted);max-width:70ch}
+  .panel{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:16px}
+
+  /* The verdict: which step got worse. One line, above the picture. */
+  .verdict{display:flex;gap:9px;align-items:flex-start;border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-bottom:16px;background:var(--surface-sunk)}
+  .verdict i{width:9px;height:9px;border-radius:2px;flex:none;margin-top:5px;background:var(--muted)}
+  .verdict.critical{background:var(--critical-wash)} .verdict.critical i{background:var(--critical)}
+  .verdict.warning{background:var(--warning-wash)} .verdict.warning i{background:var(--warning)}
+  .verdict.good{background:var(--good-wash)} .verdict.good i{background:var(--good)}
+
+  /* Funnel. The taper is a fixed illustration, not a scale: impressions are
+     thousands of times larger than purchases, so true-to-scale bars would
+     leave every step after the first invisible. The numbers carry the data. */
+  .funnel{display:grid;gap:5px}
+  .fs{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:center}
+  @media (max-width:620px){ .fs{grid-template-columns:42% minmax(0,1fr);gap:12px} }
+  .fs-shape{
+    height:58px;margin:0 auto;display:flex;align-items:center;justify-content:center;
+    font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+    clip-path:polygon(0 0,100% 0,calc(100% - var(--in)) 100%,var(--in) 100%);
+  }
+  @media (max-width:620px){ .fs-shape{font-size:14px;height:54px} }
+  .fs-text{min-width:0}
+  .fs-name{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .fs-rate{font-size:13px;margin-top:2px;overflow-wrap:anywhere}
+  .fs-rate b{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+  .fs-delta{display:inline-flex;align-items:center;gap:5px;font-size:11px;margin-top:4px;padding:2px 7px;border-radius:4px;background:var(--surface-sunk);color:var(--ink-2);font-variant-numeric:tabular-nums}
+  .fs-delta.good{background:var(--good-wash);color:var(--ink)}
+  .fs-delta.warning{background:var(--warning-wash);color:var(--ink)}
+  .fs-delta.critical{background:var(--critical-wash);color:var(--ink)}
+  .fs-flag{font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:9px}
+  .notes{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--grid);font-size:12px;color:var(--ink-2);display:grid;gap:4px}
+
+  .table-scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:820px}
+  th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
+  th{font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  th:first-child,td:first-child{text-align:left;white-space:normal;min-width:210px;overflow-wrap:anywhere}
+  td{font-size:12px;font-variant-numeric:tabular-nums}
+  tbody tr:last-child td{border-bottom:none}
+  .sub{font-size:9.5px;color:var(--muted);margin-top:2px}
+  .drill{background:none;border:0;padding:0;font:inherit;color:var(--ink);text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
+  .drill:hover{text-decoration-color:var(--accent)}
+  .drill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  td.low{background:var(--critical-wash);font-weight:600}
+
+  .state{padding:18px;border-radius:var(--radius-sm);background:var(--surface-sunk);border:1px dashed var(--rule);font-size:12.5px;color:var(--ink-2)}
+  .state b{color:var(--ink);font-weight:600;display:block;margin-bottom:3px}
+  .state.err{border-color:var(--critical);border-style:solid;background:var(--critical-wash)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  footer{margin-top:30px;padding-top:16px;border-top:1px solid var(--rule);font-size:10px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;letter-spacing:.03em}
+</style>
+</head>
+<body>
+
+<div class="login-gate" id="loginGate" hidden>
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <div class="login-brand"><img src="/fraaash-logo.webp" alt="Fraaash" width="120" height="49"></div>
+    <h2>Ads Control</h2>
+    <p>Enter the dashboard password.</p>
+    <input id="loginPw" type="password" placeholder="Password" autocomplete="current-password" aria-label="Dashboard password">
+    <button type="submit" id="loginBtn">Open dashboard</button>
+    <div class="login-err" id="loginErr" role="alert"></div>
+  </form>
+</div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <img src="/fraaash-logo.webp" alt="Fraaash" width="120" height="49">
+      <h1>Ads</h1>
+      <span class="acct">MY &middot; MYR &middot; Meta</span>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <a class="tab" href="/">Dashboard</a>
+      <a class="tab" href="/explore">Explore</a>
+      <a class="tab" href="/funnel" aria-current="page">Funnel</a>
+    </nav>
+    <div class="ranges" id="ranges" role="group" aria-label="Date range"></div>
+    <div class="freshness"><span class="dot" id="dot"></span><span id="fresh">Loading</span></div>
+    <form class="custom-range" id="customRange" hidden>
+      <label>From <input type="date" id="customSince" required></label>
+      <label>To <input type="date" id="customUntil" required></label>
+      <button type="submit" class="custom-apply">Apply</button>
+      <div class="custom-err" id="customErr" role="alert"></div>
+    </form>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="picker">
+    <div class="field">
+      <label for="levelSel">Show</label>
+      <select id="levelSel">
+        <option value="all">All campaigns</option>
+        <option value="campaign">One campaign</option>
+        <option value="adset">One ad set</option>
+      </select>
+    </div>
+    <div class="field" id="entityField" hidden>
+      <label for="entitySel">Which one</label>
+      <select id="entitySel"><option>Loading&hellip;</option></select>
+    </div>
+    <p class="picker-note" id="pickerNote">Every stage from being shown the ad to buying, for the dates selected above.</p>
+  </div>
+
+  <div id="view" hidden>
+    <div class="tiles" id="tiles"></div>
+
+    <section id="webSec">
+      <div class="sec-head">
+        <h2>Website funnel</h2>
+        <p id="webNote">Each step shows the share of the step before it that carried on.</p>
+      </div>
+      <div class="panel">
+        <div class="verdict" id="verdict"><i></i><div id="verdictText"></div></div>
+        <div class="funnel" id="webFunnel"></div>
+        <div class="notes" id="webNotes"></div>
+      </div>
+    </section>
+
+    <section id="chatSec" hidden>
+      <div class="sec-head">
+        <h2>WhatsApp funnel</h2>
+        <p>Ads that open a chat instead of the website. A sale made in chat is not visible to Meta, so this stops at the chat.</p>
+      </div>
+      <div class="panel"><div class="funnel" id="chatFunnel"></div></div>
+    </section>
+
+    <section id="breakSec" hidden>
+      <div class="sec-head">
+        <h2 id="breakTitle">By campaign</h2>
+        <p>Same dates. A shaded cell is that row's weakest step against the total. Select a name to see its own funnel.</p>
+      </div>
+      <div class="panel"><div id="breakHost"></div></div>
+    </section>
+  </div>
+
+  <div id="emptyView">
+    <div class="state" style="margin-top:20px"><b>Loading</b>Fetching the funnel.</div>
+  </div>
+
+  <footer>
+    <span>Account 26010778055250691</span>
+    <span>Meta &rarr; nightly agent &rarr; Airtable</span>
+    <span id="footStamp">&mdash;</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var RANGES = [
+    { id: "today",     label: "Today",     days: 1 },
+    { id: "yesterday", label: "Yesterday", days: 1, back: 1 },
+    { id: "last_7d",   label: "7D",        days: 7 },
+    { id: "last_14d",  label: "14D",       days: 14 },
+    { id: "last_30d",  label: "30D",       days: 30 },
+    { id: "last_90d",  label: "90D",       days: 90 },
+    { id: "custom",    label: "Custom" }
+  ];
+
+  // A step is only compared with the previous period when both periods had
+  // at least this many people entering it; below that the change is noise.
+  var MIN_BASE = 20;
+
+  var WEB_STAGES = [
+    { key: "impressions", name: "Impressions",        of: "" },
+    { key: "linkClicks",  name: "Link clicks",        of: "of impressions" },
+    { key: "lpv",         name: "Landing page views", of: "of link clicks" },
+    { key: "atc",         name: "Adds to cart",       of: "of landing page views" },
+    { key: "checkouts",   name: "Checkouts started",  of: "of adds to cart" },
+    { key: "purchases",   name: "Purchases",          of: "of checkouts started" }
+  ];
+  var CHAT_STAGES = [
+    { key: "impressions", name: "Impressions",   of: "" },
+    { key: "linkClicks",  name: "Link clicks",   of: "of impressions" },
+    { key: "chats",       name: "Chats started", of: "of link clicks" }
+  ];
+
+  var state = { range: "last_7d", custom: null, level: "all", id: null, data: null };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function todayISO() { return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10); }
+  function shiftDay(iso, d) {
+    var x = new Date(iso + "T00:00:00Z");
+    x.setUTCDate(x.getUTCDate() + d);
+    return x.toISOString().slice(0, 10);
+  }
+  function window_() {
+    if (state.range === "custom" && state.custom) return state.custom;
+    var r = RANGES.filter(function (x) { return x.id === state.range; })[0];
+    var until = shiftDay(todayISO(), -(r.back || 0));
+    return { since: shiftDay(until, -(r.days - 1)), until: until };
+  }
+
+  function fmt(n, dp) {
+    if (n === null || n === undefined || !isFinite(n)) return "—";
+    return n.toLocaleString("en-MY", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  }
+  // Rates span 0.03% to 95%, so the decimals follow the size of the number.
+  function pct(n) {
+    if (n === null || n === undefined || !isFinite(n)) return "—";
+    return fmt(n, n < 1 ? 2 : 1) + "%";
+  }
+  function rate(part, whole) { return whole > 0 ? (part / whole) * 100 : null; }
+  function shortDate(iso) {
+    var p = String(iso).split("-");
+    if (p.length !== 3) return iso;
+    var M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return parseInt(p[2], 10) + " " + M[parseInt(p[1], 10) - 1];
+  }
+  function esc(s) {
+    return String(s === null || s === undefined ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function setFresh(kind, text) {
+    $("dot").className = "dot" + (kind ? " " + kind : "");
+    $("fresh").textContent = text;
+  }
+
+  function api(path) {
+    return fetch(path, { headers: { Accept: "application/json" } }).then(function (r) {
+      return r.json().catch(function () {
+        throw { code: "bad_response", message: "The server did not return JSON (status " + r.status + ")." };
+      }).then(function (j) {
+        if (!r.ok || j.error) throw (j.error || { code: "http_" + r.status, message: "Request failed." });
+        return j;
+      });
+    }, function () { throw { code: "offline", message: "Could not reach the dashboard server." }; });
+  }
+  function errorCopy(e) {
+    var c = e && e.code;
+    if (c === "no_token") return ["Server not configured", "AIRTABLE_TOKEN is not set in Render."];
+    if (c === "airtable_auth") return ["Airtable rejected the token", "Regenerate it and update Render's Environment tab."];
+    if (c === "airtable_rate_limited") return ["Airtable is throttling", "Clears on its own within a few seconds."];
+    if (c === "not_found") return ["Nothing recorded", "No rows exist for that campaign or ad set."];
+    if (c === "airtable_unreachable" || c === "offline") return ["Cannot reach the server", "On the free tier the first load after idle takes up to a minute."];
+    return ["Could not load", (e && e.message) || "Unknown error."];
+  }
+
+  /* ---------- login gate (same contract as the dashboard) ---------- */
+  var gateOpen = false;
+  function showGate() {
+    if (gateOpen) return;
+    gateOpen = true;
+    $("loginGate").hidden = false;
+    setFresh("down", "Locked");
+    var pw = $("loginPw"); if (pw) pw.focus();
+  }
+  function isLocked(e) { return e && e.code === "locked"; }
+
+  $("loginForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var pw = $("loginPw"), btn = $("loginBtn"), err = $("loginErr");
+    if (!pw.value) { err.textContent = "Enter the password."; return; }
+    btn.disabled = true; btn.textContent = "Checking…"; err.textContent = "";
+    fetch("/api/login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw.value })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+    }).then(function (res) {
+      btn.disabled = false; btn.textContent = "Open dashboard";
+      if (res.ok) { pw.value = ""; gateOpen = false; $("loginGate").hidden = true; load(); return; }
+      err.textContent = (res.j && res.j.error && res.j.error.message) || "That password is not right.";
+      pw.select();
+    }).catch(function () {
+      btn.disabled = false; btn.textContent = "Open dashboard";
+      err.textContent = "Could not reach the server. Try again.";
+    });
+  });
+
+  /* ---------- funnel ---------- */
+
+  // Every step after the first, with its rate now and in the previous period.
+  function steps(stages, cur, prev) {
+    return stages.slice(1).map(function (st, i) {
+      var from = stages[i];
+      var now = rate(cur[st.key], cur[from.key]);
+      var was = rate(prev[st.key], prev[from.key]);
+      var comparable = cur[from.key] >= MIN_BASE && prev[from.key] >= MIN_BASE && now !== null && was !== null && was > 0;
+      return {
+        stage: st, from: from, now: now, was: was, comparable: comparable,
+        change: comparable ? ((now - was) / was) * 100 : null
+      };
+    });
+  }
+  function changeSeverity(change) {
+    if (change === null) return "";
+    if (change <= -30) return "critical";
+    if (change <= -10) return "warning";
+    if (change >= 10) return "good";
+    return "";
+  }
+
+  function drawFunnel(hostId, stages, cur, prev, firstLine) {
+    var st = steps(stages, cur, prev);
+    var worst = null;
+    st.forEach(function (s) {
+      if (s.change !== null && s.change <= -10 && (!worst || s.change < worst.change)) worst = s;
+    });
+
+    var top = 100, bottom = stages.length > 3 ? 30 : 46;
+    var width = function (i) { return top - ((top - bottom) / (stages.length - 1)) * i; };
+
+    $(hostId).innerHTML = stages.map(function (stage, i) {
+      var w = width(i);
+      var next = i < stages.length - 1 ? width(i + 1) : w * 0.82;
+      var inset = ((1 - next / w) / 2) * 100;
+      // Shade deepens down the funnel, ending on full brand green at the sale.
+      var mix = Math.round(34 + (66 / (stages.length - 1)) * i);
+      var dark = mix >= 66;
+      var shape = '<div class="fs-shape" style="width:' + w.toFixed(1) + '%;--in:' + inset.toFixed(2) + '%;' +
+        'background:color-mix(in srgb,var(--accent) ' + mix + '%,var(--surface));color:' +
+        (dark ? "var(--accent-ink)" : "var(--ink)") + '">' + esc(fmt(cur[stage.key], 0)) + "</div>";
+
+      var text = '<div class="fs-name">' + esc(stage.name) + "</div>";
+      if (i === 0) {
+        text += '<div class="fs-rate">' + firstLine + "</div>";
+      } else {
+        var s = st[i - 1];
+        text += '<div class="fs-rate"><b>' + esc(pct(s.now)) + "</b> " + esc(stage.of) + "</div>";
+        if (s.change !== null) {
+          var sev = changeSeverity(s.change);
+          text += '<div class="fs-delta ' + sev + '">' +
+            (worst === s ? '<span class="fs-flag">Biggest drop</span>' : "") +
+            (s.change >= 0 ? "▲ " : "▼ ") + esc(fmt(Math.abs(s.change), 0)) + "% &middot; was " + esc(pct(s.was)) + "</div>";
+        } else if (s.was !== null) {
+          text += '<div class="fs-delta">was ' + esc(pct(s.was)) + " &middot; too few to compare</div>";
+        }
+      }
+      return '<div class="fs">' + shape + '<div class="fs-text">' + text + "</div></div>";
+    }).join("");
+
+    return { steps: st, worst: worst };
+  }
+
+  function prevLabel(d) {
+    return shortDate(d.previous.since) + (d.previous.since === d.previous.until ? "" : " – " + shortDate(d.previous.until));
+  }
+
+  function render(d) {
+    $("emptyView").hidden = true;
+    $("view").hidden = false;
+
+    var web = d.current.web, chat = d.current.chat;
+    var showWeb = !d.scope.messaging;
+    var showChat = chat.impressions > 0 || d.scope.messaging;
+
+    var tiles;
+    if (showWeb) {
+      var perPurchase = web.purchases > 0 ? web.spend / web.purchases : null;
+      var oneIn = web.purchases > 0 ? Math.round(web.impressions / web.purchases) : null;
+      tiles = [
+        { k: "Spend",               v: "RM" + fmt(web.spend, 2),    d: "website ad sets" },
+        { k: "Impressions",         v: fmt(web.impressions, 0),      d: "times shown" },
+        { k: "Purchases",           v: fmt(web.purchases, 0),        d: "attributed by Meta" },
+        { k: "Cost per purchase",   v: perPurchase === null ? "—" : "RM" + fmt(perPurchase, 2), d: "spend ÷ purchases" },
+        { k: "Click → purchase",    v: pct(rate(web.purchases, web.linkClicks)), d: "of link clicks" },
+        { k: "Impression → purchase", v: pct(rate(web.purchases, web.impressions)), d: oneIn ? "1 in " + fmt(oneIn, 0) : "no purchases" }
+      ];
+    } else {
+      var perChat = chat.chats > 0 ? chat.spend / chat.chats : null;
+      tiles = [
+        { k: "Spend",           v: "RM" + fmt(chat.spend, 2),  d: "WhatsApp ad sets" },
+        { k: "Impressions",     v: fmt(chat.impressions, 0),   d: "times shown" },
+        { k: "Link clicks",     v: fmt(chat.linkClicks, 0),    d: pct(rate(chat.linkClicks, chat.impressions)) + " of impressions" },
+        { k: "Chats started",   v: fmt(chat.chats, 0),         d: pct(rate(chat.chats, chat.linkClicks)) + " of link clicks" },
+        { k: "Cost per chat",   v: perChat === null ? "—" : "RM" + fmt(perChat, 2), d: "not a cost per sale" },
+        { k: "Impression → chat", v: pct(rate(chat.chats, chat.impressions)), d: "of impressions" }
+      ];
+    }
+    $("tiles").innerHTML = tiles.map(function (t) {
+      return '<div class="tile"><div class="k">' + esc(t.k) + '</div><div class="v">' + esc(t.v) +
+             '</div><div class="d">' + esc(t.d) + "</div></div>";
+    }).join("");
+
+    $("webSec").hidden = !showWeb;
+    if (showWeb) {
+      if (web.impressions === 0) {
+        $("verdict").hidden = true;
+        $("webFunnel").innerHTML = '<div class="state"><b>Nothing in this window</b>No website ad set recorded funnel data for these dates. Widen the range.</div>';
+        $("webNotes").innerHTML = "";
+      } else {
+        var cpm = (web.spend / web.impressions) * 1000;
+        var out = drawFunnel("webFunnel", WEB_STAGES, web, d.previous.web,
+          "RM" + esc(fmt(web.spend, 2)) + " spent &middot; RM" + esc(fmt(cpm, 2)) + " per 1,000");
+
+        var v = $("verdict"), vt = $("verdictText");
+        v.hidden = false;
+        var compared = out.steps.filter(function (s) { return s.change !== null; });
+        if (out.worst) {
+          v.className = "verdict " + changeSeverity(out.worst.change);
+          vt.innerHTML = "<b>" + esc(out.worst.from.name) + " → " + esc(out.worst.stage.name.toLowerCase()) +
+            "</b> fell the most: " + esc(pct(out.worst.now)) + " now against " + esc(pct(out.worst.was)) +
+            " in the " + esc(prevLabel(d)) + " period before.";
+        } else if (compared.length) {
+          v.className = "verdict good";
+          vt.innerHTML = "No step fell by more than 10% against the " + esc(prevLabel(d)) + " period before.";
+        } else {
+          v.className = "verdict";
+          vt.innerHTML = "Too little traffic in this window or the one before it to say which step changed. Try a longer range.";
+        }
+
+        var notes = [];
+        if (web.purchases < 10) {
+          notes.push("Only " + web.purchases + " purchase" + (web.purchases === 1 ? "" : "s") +
+            " in this window, so the last steps are rough. A longer range gives a steadier read.");
+        }
+        if (d.current.rowsWithData < d.current.rows) {
+          notes.push("Funnel steps are recorded for " + d.current.rowsWithData + " of " + d.current.rows +
+            " ad-set days in this window; the others are left out of every figure here." +
+            (d.funnelFrom ? " Recording starts " + shortDate(d.funnelFrom) + "." : ""));
+        }
+        notes.push("Counts are Meta's. A step can exceed the one before it when someone returns later without clicking the ad again.");
+        $("webNotes").innerHTML = notes.map(function (n) { return "<div>" + esc(n) + "</div>"; }).join("");
+      }
+    }
+
+    $("chatSec").hidden = !showChat;
+    if (showChat) {
+      if (chat.impressions === 0) {
+        $("chatFunnel").innerHTML = '<div class="state"><b>Nothing in this window</b>No WhatsApp ad ran on these dates.</div>';
+      } else {
+        drawFunnel("chatFunnel", CHAT_STAGES, chat, d.previous.chat,
+          "RM" + esc(fmt(chat.spend, 2)) + " spent &middot; RM" +
+          esc(chat.chats > 0 ? fmt(chat.spend / chat.chats, 2) : "—") + " per chat");
+      }
+    }
+
+    renderBreakdown(d);
+  }
+
+  function renderBreakdown(d) {
+    var rows = d.breakdown || [];
+    $("breakSec").hidden = !rows.length;
+    if (!rows.length) return;
+    $("breakTitle").textContent = d.scope.level === "all" ? "By campaign" : "By ad set";
+
+    var total = d.current.web;
+    var cols = [
+      { h: "Click",    a: "linkClicks", b: "impressions" },
+      { h: "Landing",  a: "lpv",        b: "linkClicks" },
+      { h: "Cart",     a: "atc",        b: "lpv" },
+      { h: "Checkout", a: "checkouts",  b: "atc" },
+      { h: "Purchase", a: "purchases",  b: "checkouts" }
+    ];
+
+    var body = rows.map(function (r) {
+      var name = '<button type="button" class="drill" data-level="' + esc(r.level) + '" data-id="' + esc(r.id) + '">' + esc(r.name) + "</button>";
+      if (r.messaging) {
+        var c = r.chat;
+        return "<tr><td>" + name + '<div class="sub">WhatsApp &middot; ' + esc(fmt(c.chats, 0)) + " chats &middot; " +
+          esc(pct(rate(c.chats, c.linkClicks))) + " of link clicks</div></td>" +
+          "<td>RM" + esc(fmt(c.spend, 2)) + "</td><td>" + esc(fmt(c.impressions, 0)) + "</td>" +
+          "<td>" + esc(pct(rate(c.linkClicks, c.impressions))) + "</td>" +
+          "<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>";
+      }
+      var w = r.web;
+      // Weakest step = furthest below the total's rate, where there is enough traffic to say so.
+      var worst = null;
+      cols.forEach(function (col) {
+        var mine = rate(w[col.a], w[col.b]), all = rate(total[col.a], total[col.b]);
+        if (mine === null || all === null || all === 0 || w[col.b] < MIN_BASE) return;
+        var gap = (mine - all) / all;
+        if (gap <= -0.15 && (!worst || gap < worst.gap)) worst = { h: col.h, gap: gap };
+      });
+      return "<tr><td>" + name + '<div class="sub">' + esc(r.status || "—") + "</div></td>" +
+        "<td>RM" + esc(fmt(w.spend, 2)) + "</td><td>" + esc(fmt(w.impressions, 0)) + "</td>" +
+        cols.map(function (col) {
+          return "<td" + (worst && worst.h === col.h ? ' class="low"' : "") + ">" + esc(pct(rate(w[col.a], w[col.b]))) + "</td>";
+        }).join("") +
+        "<td>" + esc(fmt(w.purchases, 0)) + "</td>" +
+        "<td>" + (w.purchases > 0 ? "RM" + esc(fmt(w.spend / w.purchases, 2)) : "—") + "</td></tr>";
+    }).join("");
+
+    $("breakHost").innerHTML = '<div class="table-scroll"><table><thead><tr>' +
+      "<th>" + (d.scope.level === "all" ? "Campaign" : "Ad set") + "</th><th>Spend</th><th>Impressions</th>" +
+      cols.map(function (c) { return "<th>" + c.h + " rate</th>"; }).join("") +
+      "<th>Purchases</th><th>Cost / purchase</th></tr></thead><tbody>" + body + "</tbody></table></div>";
+
+    Array.prototype.forEach.call($("breakHost").querySelectorAll(".drill"), function (b) {
+      b.addEventListener("click", function () {
+        state.level = b.dataset.level; state.id = b.dataset.id;
+        $("levelSel").value = state.level;
+        syncUrl(); load();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    });
+  }
+
+  /* ---------- picker ---------- */
+  function fillEntities() {
+    var d = state.data;
+    $("entityField").hidden = state.level === "all";
+    if (state.level === "all" || !d) return;
+    var list = state.level === "campaign" ? d.campaigns : d.adsets;
+    var sel = $("entitySel");
+    sel.innerHTML = '<option value="">Choose…</option>' + list.map(function (e) {
+      return '<option value="' + esc(e.id) + '">' + esc(e.name + "  ·  last ran " + shortDate(e.lastDate)) + "</option>";
+    }).join("");
+    if (state.id && list.some(function (e) { return e.id === state.id; })) sel.value = state.id;
+  }
+
+  function load() {
+    var w = window_();
+    // Choosing a level without an entity yet still needs the dropdown lists,
+    // which come back with the account-wide funnel.
+    var scoped = state.level !== "all" && state.id;
+    var q = "?since=" + w.since + "&until=" + w.until +
+      (scoped ? "&level=" + encodeURIComponent(state.level) + "&id=" + encodeURIComponent(state.id) : "");
+    setFresh("", "Fetching");
+    api("/api/funnel" + q).then(function (d) {
+      state.data = d;
+      fillEntities();
+      if (state.level !== "all" && !state.id) {
+        $("view").hidden = true;
+        $("emptyView").hidden = false;
+        $("emptyView").innerHTML = '<div class="state" style="margin-top:20px"><b>Pick one above</b>Choose ' +
+          (state.level === "campaign" ? "a campaign" : "an ad set") + " to see its funnel.</div>";
+      } else {
+        render(d);
+      }
+      $("pickerNote").textContent = shortDate(d.since) + (d.since === d.until ? "" : " – " + shortDate(d.until)) +
+        ", compared with " + prevLabel(d) + ".";
+      var t = new Date(d.cachedAt || Date.now());
+      var txt = "Updated " + t.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" });
+      setFresh("live", txt);
+      $("footStamp").textContent = txt;
+    }).catch(function (e) {
+      if (isLocked(e)) return showGate();
+      var c = errorCopy(e);
+      $("view").hidden = true;
+      $("emptyView").hidden = false;
+      $("emptyView").innerHTML = '<div class="state err" style="margin-top:20px"><b>' + esc(c[0]) + "</b>" + esc(c[1]) + "</div>";
+      setFresh("down", c[0]);
+    });
+  }
+
+  function syncUrl() {
+    var u = new URL(window.location.href);
+    ["level", "id", "range", "since", "until"].forEach(function (k) { u.searchParams.delete(k); });
+    if (state.level !== "all" && state.id) { u.searchParams.set("level", state.level); u.searchParams.set("id", state.id); }
+    if (state.range !== "last_7d") u.searchParams.set("range", state.range);
+    if (state.range === "custom" && state.custom) {
+      u.searchParams.set("since", state.custom.since);
+      u.searchParams.set("until", state.custom.until);
+    }
+    history.replaceState(null, "", u.toString());
+  }
+
+  /* ---------- date range ---------- */
+  function markRange() {
+    Array.prototype.forEach.call($("ranges").children, function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.range === state.range));
+    });
+  }
+
+  function buildRanges() {
+    var host = $("ranges");
+    host.innerHTML = "";
+    RANGES.forEach(function (r) {
+      var b = document.createElement("button");
+      b.className = "range-btn"; b.type = "button"; b.textContent = r.label;
+      b.dataset.range = r.id;
+      b.addEventListener("click", function () {
+        var form = $("customRange");
+        if (r.id === "custom") {
+          // Toggle the picker; the range only changes once Apply is pressed.
+          if (!form.hidden) { form.hidden = true; return; }
+          var cur = window_();
+          $("customSince").value = cur.since;
+          $("customUntil").value = cur.until;
+          $("customSince").max = $("customUntil").max = todayISO();
+          $("customErr").textContent = "";
+          form.hidden = false;
+          $("customSince").focus();
+          return;
+        }
+        form.hidden = true;
+        if (state.range === r.id) return;
+        state.range = r.id; state.custom = null;
+        markRange(); syncUrl(); load();
+      });
+      host.appendChild(b);
+    });
+    markRange();
+  }
+
+  $("customRange").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var a = $("customSince").value, b = $("customUntil").value, err = $("customErr");
+    if (!a || !b) { err.textContent = "Pick both dates."; return; }
+    if (a > b) { err.textContent = "From is after To."; return; }
+    if (b > todayISO()) { err.textContent = "To is in the future."; return; }
+    err.textContent = "";
+    state.range = "custom"; state.custom = { since: a, until: b };
+    $("customRange").hidden = true;
+    markRange(); syncUrl(); load();
+  });
+
+  $("levelSel").addEventListener("change", function () {
+    state.level = this.value;
+    state.id = null;
+    fillEntities(); syncUrl(); load();
+  });
+  $("entitySel").addEventListener("change", function () {
+    state.id = this.value || null;
+    syncUrl(); load();
+  });
+
+  // Deep links: /funnel?level=campaign&id=…&range=custom&since=…&until=…
+  var q = new URLSearchParams(window.location.search);
+  if (q.get("level") === "campaign" || q.get("level") === "adset") state.level = q.get("level");
+  if (q.get("id")) state.id = q.get("id");
+  if (RANGES.some(function (r) { return r.id === q.get("range"); })) state.range = q.get("range");
+  var ISO = /^\d{4}-\d{2}-\d{2}$/;
+  if (ISO.test(q.get("since") || "") && ISO.test(q.get("until") || "")) {
+    state.range = "custom";
+    state.custom = { since: q.get("since"), until: q.get("until") };
+  } else if (state.range === "custom") {
+    state.range = "last_7d";
+  }
+  $("levelSel").value = state.level;
+
+  buildRanges();
+  load();
+})();
+</script>
+</body>
+</html>
