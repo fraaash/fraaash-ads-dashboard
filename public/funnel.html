@@ -70,6 +70,19 @@
   .fs-flag{font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:9px}
   .notes{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--grid);font-size:12px;color:var(--ink-2);display:grid;gap:4px}
 
+  .chart-title{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 8px}
+  .chart-title + .chart-host{margin-bottom:18px}
+  .chart-host{position:relative;width:100%}
+  svg.chart{display:block;width:100%;height:auto;overflow:visible}
+  .tick{font-size:9px;fill:var(--muted);font-variant-numeric:tabular-nums}
+  .axis-line{stroke:var(--rule);stroke-width:1}
+  .gridline{stroke:var(--grid);stroke-width:1}
+  .tooltip{position:absolute;pointer-events:none;z-index:10;background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:8px 10px;font-size:11px;min-width:128px;box-shadow:0 6px 20px rgba(0,0,0,.14);opacity:0;transition:opacity .12s ease;font-variant-numeric:tabular-nums}
+  .tooltip.on{opacity:1}
+  .tt-d{font-size:9px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
+  .tt-r{display:flex;justify-content:space-between;gap:14px}
+  .tt-r b{font-weight:600}
+
   .table-scroll{overflow-x:auto}
   table{border-collapse:collapse;width:100%;min-width:820px}
   th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
@@ -166,6 +179,19 @@
         <p>Ads that open a chat instead of the website. A sale made in chat is not visible to Meta, so this stops at the chat.</p>
       </div>
       <div class="panel"><div class="funnel" id="chatFunnel"></div></div>
+    </section>
+
+    <section id="chatTrendSec" hidden>
+      <div class="sec-head">
+        <h2>Cost per chat, day by day</h2>
+        <p id="chatTrendNote">Spend divided by chats started, for the WhatsApp ad sets in the dates selected. This is the cost of a conversation, not of a sale.</p>
+      </div>
+      <div class="panel">
+        <p class="chart-title">Cost per chat (RM)</p>
+        <div class="chart-host" id="chatCostHost"></div>
+        <p class="chart-title">Chats started</p>
+        <div class="chart-host" id="chatCountHost"></div>
+      </div>
     </section>
 
     <section id="breakSec" hidden>
@@ -378,6 +404,131 @@
     return { steps: st, worst: worst };
   }
 
+  /* ---------- WhatsApp daily charts ---------- */
+  function attachTip(host, rows, xOf, tipHtml) {
+    var tt = host.querySelector(".tooltip"), svgEl = host.querySelector("svg");
+    var cross = host.querySelector(".crosshair");
+    svgEl.addEventListener("mousemove", function (ev) {
+      var tgt = ev.target;
+      if (!tgt || !tgt.getAttribute || tgt.getAttribute("data-i") === null) {
+        tt.classList.remove("on"); if (cross) cross.setAttribute("opacity","0"); return;
+      }
+      var i = parseInt(tgt.getAttribute("data-i"), 10), r = rows[i];
+      var rect = host.getBoundingClientRect();
+      if (cross) { cross.setAttribute("x1", xOf(i)); cross.setAttribute("x2", xOf(i)); cross.setAttribute("opacity","1"); }
+      tt.innerHTML = '<div class="tt-d">' + esc(shortDate(r.date)) + "</div>" + tipHtml(r);
+      tt.classList.add("on");
+      var tw = tt.offsetWidth;
+      tt.style.left = Math.max(0, Math.min(rect.width - tw, (ev.clientX - rect.left) - tw / 2)) + "px";
+      tt.style.top = Math.max(0, (ev.clientY - rect.top) - tt.offsetHeight - 12) + "px";
+    });
+    svgEl.addEventListener("mouseleave", function () {
+      tt.classList.remove("on"); if (cross) cross.setAttribute("opacity","0");
+    });
+  }
+
+  // Cost per chat runs at a few ringgit, so the axis steps in whole or half
+  // ringgit rather than the tens the purchase charts use.
+  function niceMax(v) {
+    var steps = [1, 2, 4, 6, 8, 10, 20, 40, 60, 80, 100, 200, 400, 1000];
+    for (var i = 0; i < steps.length; i++) if (v * 1.1 <= steps[i]) return steps[i];
+    return Math.ceil(v * 1.1 / 100) * 100;
+  }
+
+  function chatTip(r) {
+    return '<div class="tt-r"><span>Cost per chat</span><b>' + (r.costPerChat === null ? "—" : "RM" + esc(fmt(r.costPerChat, 2))) + "</b></div>" +
+      '<div class="tt-r"><span>Chats started</span><b>' + esc(fmt(r.chats, 0)) + "</b></div>" +
+      '<div class="tt-r"><span>Spend</span><b>RM' + esc(fmt(r.spend, 2)) + "</b></div>";
+  }
+
+  // Every day in the window keeps its place on the x axis. A day that spent
+  // but started no chat has no cost per chat, so the line breaks there.
+  function chatCostChart(hostId, rows, avg) {
+    var host = $(hostId);
+    var W=760,H=220,mL=46,mR=16,mT=14,mB=28, iw=W-mL-mR, ih=H-mT-mB;
+    var vals = rows.filter(function (r) { return r.costPerChat !== null; }).map(function (r) { return r.costPerChat; });
+    var maxV = niceMax(Math.max.apply(null, vals.concat([avg || 0])));
+    // Points sit at the centre of each day's band so they line up with the bars below.
+    var band = iw/rows.length;
+    var x = function(i){ return mL + band*i + band/2; };
+    var y = function(v){ return mT + ih - (v/maxV)*ih; };
+    var s = ['<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Cost per chat started, by day">'];
+    for (var k=0;k<=4;k++){
+      var tv = (maxV/4)*k;
+      s.push('<line class="gridline" x1="'+mL+'" y1="'+y(tv)+'" x2="'+(W-mR)+'" y2="'+y(tv)+'"/>');
+      s.push('<text class="tick" x="'+(mL-8)+'" y="'+(y(tv)+3)+'" text-anchor="end">RM'+esc(fmt(tv, maxV < 8 ? 2 : 0))+'</text>');
+    }
+    if (avg !== null) {
+      s.push('<line x1="'+mL+'" y1="'+y(avg)+'" x2="'+(W-mR)+'" y2="'+y(avg)+'" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3"/>');
+      s.push('<text class="tick" x="'+(W-mR)+'" y="'+(y(avg)-5)+'" text-anchor="end" style="font-weight:600">Average RM'+esc(fmt(avg, 2))+'</text>');
+    }
+    var d = "", pen = false;
+    rows.forEach(function (r, i) {
+      if (r.costPerChat === null) { pen = false; return; }
+      d += (pen ? "L" : "M") + x(i) + " " + y(r.costPerChat) + " ";
+      pen = true;
+    });
+    s.push('<path d="'+d+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+    rows.forEach(function (r, i) {
+      if (r.costPerChat !== null) s.push('<circle cx="'+x(i)+'" cy="'+y(r.costPerChat)+'" r="3.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>');
+    });
+    var every = Math.max(1, Math.ceil(rows.length/7));
+    rows.forEach(function(r,i){
+      if (i%every===0 || i===rows.length-1)
+        s.push('<text class="tick" x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(shortDate(r.date))+'</text>');
+    });
+    s.push('<line class="axis-line" x1="'+mL+'" y1="'+(mT+ih)+'" x2="'+(W-mR)+'" y2="'+(mT+ih)+'"/>');
+    s.push('<line class="crosshair" x1="0" y1="'+mT+'" x2="0" y2="'+(mT+ih)+'" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>');
+    rows.forEach(function(r,i){
+      s.push('<rect x="'+(mL+band*i)+'" y="'+mT+'" width="'+band+'" height="'+ih+'" fill="transparent" data-i="'+i+'"/>');
+    });
+    s.push('</svg>');
+    host.innerHTML = s.join("") + '<div class="tooltip"></div>';
+    attachTip(host, rows, x, chatTip);
+  }
+
+  function chatCountChart(hostId, rows) {
+    var host = $(hostId);
+    var W=760,H=160,mL=46,mR=16,mT=12,mB=28, iw=W-mL-mR, ih=H-mT-mB;
+    var maxV = niceMax(Math.max.apply(null, rows.map(function(r){return r.chats;}).concat([1])));
+    var band = iw/rows.length, bw = Math.max(3, Math.min(30, band-2));
+    var y = function(v){ return mT + ih - (v/maxV)*ih; };
+    var cx = function(i){ return mL + band*i + band/2; };
+    var s = ['<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Chats started, by day">'];
+    for (var k=0;k<=2;k++){
+      var tv = (maxV/2)*k;
+      s.push('<line class="gridline" x1="'+mL+'" y1="'+y(tv)+'" x2="'+(W-mR)+'" y2="'+y(tv)+'"/>');
+      s.push('<text class="tick" x="'+(mL-8)+'" y="'+(y(tv)+3)+'" text-anchor="end">'+esc(fmt(tv, 0))+'</text>');
+    }
+    rows.forEach(function(r,i){
+      if (r.chats > 0) s.push('<rect x="'+(cx(i)-bw/2)+'" y="'+y(r.chats)+'" width="'+bw+'" height="'+Math.max(2,(mT+ih)-y(r.chats))+'" rx="4" fill="var(--accent)"/>');
+      s.push('<rect x="'+(mL+band*i)+'" y="'+mT+'" width="'+band+'" height="'+ih+'" fill="transparent" data-i="'+i+'"/>');
+    });
+    var every = Math.max(1, Math.ceil(rows.length/7));
+    rows.forEach(function(r,i){
+      if (i%every===0 || i===rows.length-1)
+        s.push('<text class="tick" x="'+cx(i)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(shortDate(r.date))+'</text>');
+    });
+    s.push('<line class="axis-line" x1="'+mL+'" y1="'+(mT+ih)+'" x2="'+(W-mR)+'" y2="'+(mT+ih)+'"/>');
+    s.push('</svg>');
+    host.innerHTML = s.join("") + '<div class="tooltip"></div>';
+    attachTip(host, rows, cx, chatTip);
+  }
+
+  function renderChatTrend(d, show) {
+    var rows = d.chatDaily || [];
+    $("chatTrendSec").hidden = !show || !rows.length;
+    if (!show || !rows.length) return;
+    var chat = d.current.chat;
+    var avg = chat.chats > 0 ? chat.spend / chat.chats : null;
+    if (rows.some(function (r) { return r.costPerChat !== null; })) {
+      chatCostChart("chatCostHost", rows, avg);
+    } else {
+      $("chatCostHost").innerHTML = '<div class="state"><b>Nothing to plot</b>No chat was started on these dates.</div>';
+    }
+    chatCountChart("chatCountHost", rows);
+  }
+
   function prevLabel(d) {
     return shortDate(d.previous.since) + (d.previous.since === d.previous.until ? "" : " – " + shortDate(d.previous.until));
   }
@@ -471,6 +622,7 @@
       }
     }
 
+    renderChatTrend(d, showChat);
     renderBreakdown(d);
   }
 

@@ -692,6 +692,24 @@ function funnelOf(rows) {
   return { web, chat, rows: spendRows, rowsWithData: withData };
 }
 
+// One point per day for the WhatsApp ad sets in scope, for the cost-per-chat
+// chart. Cost per chat is left null on a day that spent but started no chat:
+// the chart shows that as a gap, since RM0 would read as a free chat.
+function chatDailyOf(rows) {
+  const byDate = new Map();
+  for (const r of rows) {
+    if (!isMessagingObjective(r.objective) || r.spend <= 0) continue;
+    const d = byDate.get(r.date) || { date: r.date, spend: 0, chats: 0, impressions: 0 };
+    d.spend += r.spend;
+    d.chats += r.chats;
+    d.impressions += r.impressions;
+    byDate.set(r.date, d);
+  }
+  return [...byDate.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((d) => Object.assign(d, { costPerChat: d.chats > 0 ? d.spend / d.chats : null }));
+}
+
 app.get("/api/funnel", async (req, res, next) => {
   const { since, until } = range(req);
   const level = ["campaign", "adset"].includes(req.query.level) ? req.query.level : "all";
@@ -774,6 +792,7 @@ app.get("/api/funnel", async (req, res, next) => {
         messaging: level !== "all" && isMessagingObjective(last.objective),
       },
       current: funnelOf(mine),
+      chatDaily: chatDailyOf(mine),
       breakdown,
       campaigns: pick((r) => r.campaignId, (r) => r.campaign || "Untitled campaign"),
       adsets: pick((r) => r.adsetId, (r) => r.adset, (r) => ({ campaignId: r.campaignId })),
